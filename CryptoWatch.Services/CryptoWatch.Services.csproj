@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="27.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
+    <PackageReference Include="Slack.Webhooks" Version="1.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\CoinMarketCap\CoinMarketCap\CoinMarketCap.csproj" />
+    <ProjectReference Include="..\CryptoWatch.Core\CryptoWatch.Core.csproj" />
+    <ProjectReference Include="..\CryptoWatch.Entities\CryptoWatch.Entities.csproj" />
+  </ItemGroup>
+
+</Project>

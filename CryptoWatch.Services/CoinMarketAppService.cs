@@ -99,16 +99,35 @@ namespace CryptoWatch.Services {
 				asset.Price = Convert.ToDecimal( price.Value );
 			}
 
-			var cashBalance = this.assets.First( a => a.Symbol.Equals( "USD" ) ).Value;
+			var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
 			for( var i = 0; i < this.assets.Count; i++ ) {
 				var current = this.assets[ i ];
 				base.Logger.LogInformation( $"{current.Name} ({current.Symbol}): {current.Value:C} / notified at {current.NotifiedAt:C} / range {current.BuyBoundary:C} - {current.SellBoundary:C}" );
-				if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary  )
+				if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
 					continue;
-				if( current.Value <= current.BuyBoundary )
-					await this.slack.SendMessageAsync( $"@here BUY {current.Name} ({current.Symbol}) {current.NotifiedAt - current.Value:C} (cash: {cashBalance:C})" );
-				else
-					await this.slack.SendMessageAsync( $"@here SELL {current.Name} ({current.Symbol}) {current.Value - current.NotifiedAt:C}" );
+
+				if( current.Value <= current.BuyBoundary ) {
+					var amount = current.NotifiedAt - current.Value;
+					if( cash.Value > 50m ) {
+						var msg = $"BUY {current.Name} ({current.Symbol}) {amount:C} (cash: {cash.Value:C})";
+						await this.slack.SendMessageAsync( $"@here {msg}" );
+						base.Logger.LogWarning( msg );
+						// assume the buy happens and reduce cash
+						cash.Amount -= amount;
+					} else {
+						var msg = $"BUY {current.Name} ({current.Symbol}) {amount:C} (cash: {cash.Value:C}) *** not enough cash ***";
+						await this.slack.SendMessageAsync( $"@here {msg}" );
+						base.Logger.LogError( msg );
+					}
+				} else {
+					var amount = current.Value - current.NotifiedAt;
+					var msg = $"SELL {current.Name} ({current.Symbol}) {amount:C}";
+					await this.slack.SendMessageAsync( $"@here {msg}" );
+					base.Logger.LogWarning( msg );
+					// assume the sell happens and increase cash
+					cash.Amount += amount;
+				}
+
 				// prevent multiple notifications at roughly the same value
 				current.NotifiedAt = current.Value;
 			}

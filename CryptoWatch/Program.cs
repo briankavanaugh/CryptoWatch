@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using CryptoWatch.Core.Config;
 using CryptoWatch.Entities.Contexts;
 using CryptoWatch.Services;
@@ -7,13 +8,21 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 using Slack.Webhooks;
 
 namespace CryptoWatch {
 	static class Program {
 		private static async Task Main( string[ ] args ) {
 			using var host = AppStartup( args );
-			await host.RunAsync( );
+			try {
+				await host.RunAsync( );
+			} catch( Exception ex ) {
+				Log.Logger.Error( ex, "Exiting application." );
+			} finally {
+				Log.Logger.Information( "Closing logs." );
+				Log.CloseAndFlush( );
+			}
 		}
 
 		private static IHost AppStartup( string[ ] args ) =>
@@ -30,7 +39,7 @@ namespace CryptoWatch {
 				    Log.Logger = new LoggerConfiguration( )
 				                 .ReadFrom.Configuration( configurationRoot )
 				                 .Enrich.FromLogContext( )
-				                 .WriteTo.Console( )
+				                 .WriteTo.EventLog( "CryptoWatch", manageEventSource: true, restrictedToMinimumLevel: LogEventLevel.Warning )
 				                 .CreateLogger( );
 
 				    Log.Logger.Information( "Application Starting" );
@@ -38,8 +47,8 @@ namespace CryptoWatch {
 			    .ConfigureServices( ( context, services ) => {
 				    // load configuration sections
 				    var general = new GeneralConfiguration( );
-					context.Configuration.Bind( "General", general );
-					services.AddSingleton( general );
+				    context.Configuration.Bind( "General", general );
+				    services.AddSingleton( general );
 
 				    var cma = new CoinMarketCapConfiguration( );
 				    context.Configuration.Bind( "CoinMarketCap", cma );
@@ -53,11 +62,11 @@ namespace CryptoWatch {
 				    services.AddSingleton( slack );
 
 				    var contexts = new ConnectionStringsConfiguration( );
-					context.Configuration.Bind( "ConnectionStrings", contexts );
-					services.AddSingleton( contexts );
+				    context.Configuration.Bind( "ConnectionStrings", contexts );
+				    services.AddSingleton( contexts );
 
-					// add database contexts
-					services.AddDbContextPool<CryptoContext>( options => options.UseMySql( contexts.Crypto, ServerVersion.AutoDetect( contexts.Crypto ) ) );
+				    // add database contexts
+				    services.AddDbContextPool<CryptoContext>( options => options.UseMySql( contexts.Crypto, ServerVersion.AutoDetect( contexts.Crypto ) ) );
 
 				    // add services
 				    services.AddSingleton<WatchService>( );

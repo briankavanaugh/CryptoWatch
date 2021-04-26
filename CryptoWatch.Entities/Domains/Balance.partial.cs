@@ -14,10 +14,10 @@ namespace CryptoWatch.Entities.Domains {
 
 		[NotMapped]
 		public decimal BuyBoundary 
-			=> this.NotifiedAt - this.NotifiedAt * 0.10m;
+			=> this.NotifiedAt < 10m ? 0m : this.NotifiedAt - 10m;
 
 		[NotMapped]
 		public decimal SellBoundary
-			=> this.NotifiedAt + this.NotifiedAt * 0.10m;
+			=> this.NotifiedAt + 10m;
 	}
 }

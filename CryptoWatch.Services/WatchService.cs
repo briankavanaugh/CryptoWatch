@@ -104,6 +104,8 @@ namespace CryptoWatch.Services {
 			this.client = new CoinMarketCapClient( this.cmcConfig.ApiKey );
 			client.HttpClient.BaseAddress = new Uri( this.cmcConfig.BaseUrl );
 			base.Logger.LogInformation( $"Starting file watcher for {this.generalConfig.WatchDirectory}" );
+			// create directory if it doesn't exist
+			Directory.CreateDirectory( this.generalConfig.WatchDirectory );
 			this.watcher = new FileSystemWatcher( this.generalConfig.WatchDirectory ) {
 				NotifyFilter = NotifyFilters.Attributes
 				               | NotifyFilters.CreationTime

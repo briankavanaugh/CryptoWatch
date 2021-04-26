@@ -102,28 +102,28 @@ namespace CryptoWatch.Services {
 			var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
 			for( var i = 0; i < this.assets.Count; i++ ) {
 				var current = this.assets[ i ];
-				base.Logger.LogInformation( $"{current.Name} ({current.Symbol}): {current.Value:C} / notified at {current.NotifiedAt:C} / range {current.BuyBoundary:C} - {current.SellBoundary:C}" );
+				base.Logger.LogInformation( !current.Exclude
+					                           ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / notified at {current.NotifiedAt,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
+					                           : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
+				                          );
 				if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
 					continue;
 
 				if( current.Value <= current.BuyBoundary ) {
 					var amount = current.NotifiedAt - current.Value;
 					if( cash.Value > 50m ) {
-						var msg = $"BUY {current.Name} ({current.Symbol}) {amount:C} (cash: {cash.Value:C})";
-						await this.slack.SendMessageAsync( $"@here {msg}" );
-						base.Logger.LogWarning( msg );
+						await this.slack.SendMessageAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
+						base.Logger.LogWarning( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C}" );
 						// assume the buy happens and reduce cash
 						cash.Amount -= amount;
 					} else {
-						var msg = $"BUY {current.Name} ({current.Symbol}) {amount:C} (cash: {cash.Value:C}) *** not enough cash ***";
-						await this.slack.SendMessageAsync( $"@here {msg}" );
-						base.Logger.LogError( msg );
+						await this.slack.SendMessageAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
+						base.Logger.LogError( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C} *** not enough cash ***" );
 					}
 				} else {
 					var amount = current.Value - current.NotifiedAt;
-					var msg = $"SELL {current.Name} ({current.Symbol}) {amount:C}";
-					await this.slack.SendMessageAsync( $"@here {msg}" );
-					base.Logger.LogWarning( msg );
+					await this.slack.SendMessageAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})" );
+					base.Logger.LogWarning( $"\t{amount,7:C} SELL {current.Symbol,-4} ({current.Name + ")",-22}" );
 					// assume the sell happens and increase cash
 					cash.Amount += amount;
 				}
@@ -133,7 +133,7 @@ namespace CryptoWatch.Services {
 			}
 
 			var sum = this.assets.Sum( a => a.Value );
-			base.Logger.LogInformation( $"Account balance: {sum:C}" );
+			base.Logger.LogInformation( $"Account balance: {sum,10:C}" );
 		}
 
 		private async Task loadInitialData( CancellationToken cancellationToken ) {

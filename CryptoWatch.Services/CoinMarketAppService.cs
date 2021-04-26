@@ -70,6 +70,7 @@ namespace CryptoWatch.Services {
 				}
 
 				base.Logger.LogInformation( "Sleeping for five minutes." );
+				Console.WriteLine( );
 				await Task.Delay( TimeSpan.FromMinutes( 5 ), cancellationToken );
 				if( cancellationToken.IsCancellationRequested )
 					break;
@@ -84,6 +85,7 @@ namespace CryptoWatch.Services {
 
 			if( this.watcher.Changed || this.assets == null ) {
 				this.assets = await this.context.Balances.ToListAsync( cancellationToken );
+				this.watcher.Changed = false;
 			}
 
 			var parameters = new LatestQuoteParameters( );
@@ -100,16 +102,19 @@ namespace CryptoWatch.Services {
 			var cashBalance = this.assets.First( a => a.Symbol.Equals( "USD" ) ).Value;
 			for( var i = 0; i < this.assets.Count; i++ ) {
 				var current = this.assets[ i ];
-				base.Logger.LogInformation( $"{current.Name} ({current.Symbol}): {current.Value:C}" );
+				base.Logger.LogInformation( $"{current.Name} ({current.Symbol}): {current.Value:C} / notified at {current.NotifiedAt:C} / range {current.BuyBoundary:C} - {current.SellBoundary:C}" );
 				if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary  )
 					continue;
-				if( current.Value <= 90 )
+				if( current.Value <= current.BuyBoundary )
 					await this.slack.SendMessageAsync( $"@here BUY {current.Name} ({current.Symbol}) {current.NotifiedAt - current.Value:C} (cash: {cashBalance:C})" );
 				else
 					await this.slack.SendMessageAsync( $"@here SELL {current.Name} ({current.Symbol}) {current.Value - current.NotifiedAt:C}" );
 				// prevent multiple notifications at roughly the same value
 				current.NotifiedAt = current.Value;
 			}
+
+			var sum = this.assets.Sum( a => a.Value );
+			base.Logger.LogInformation( $"Account balance: {sum:C}" );
 		}
 
 		private async Task loadInitialData( CancellationToken cancellationToken ) {

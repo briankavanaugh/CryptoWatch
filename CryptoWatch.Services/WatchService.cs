@@ -106,8 +106,13 @@ namespace CryptoWatch.Services {
 			base.Logger.LogInformation( $"Starting file watcher for {this.generalConfig.WatchDirectory}" );
 			this.watcher = new FileSystemWatcher( this.generalConfig.WatchDirectory ) {
 				NotifyFilter = NotifyFilters.Attributes
+				               | NotifyFilters.CreationTime
+				               | NotifyFilters.DirectoryName
+				               | NotifyFilters.FileName
+				               | NotifyFilters.LastAccess
 				               | NotifyFilters.LastWrite
-							   | NotifyFilters.Size,
+				               | NotifyFilters.Security
+				               | NotifyFilters.Size,
 				Filter = "*.csv",
 				IncludeSubdirectories = false,
 				EnableRaisingEvents = true

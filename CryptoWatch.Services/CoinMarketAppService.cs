@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using CoinMarketCap;
 using CoinMarketCap.Models.Cryptocurrency;
 using CryptoWatch.Core.Config;
-using CryptoWatch.Core.Utilities;
 using CryptoWatch.Entities.Contexts;
 using CryptoWatch.Entities.Domains;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +18,6 @@ namespace CryptoWatch.Services {
 
 		private readonly CoinMarketCapConfiguration config;
 		private readonly CryptoContext context;
-		private readonly SlackClient slack;
 		private readonly WatchService watcher;
 
 		private CoinMarketCapClient client;
@@ -35,13 +33,13 @@ namespace CryptoWatch.Services {
 		public CoinMarketCapService(
 			ILogger<CoinMarketCapService> logger,
 			CoinMarketCapConfiguration config,
+			IntegrationsConfiguration intConfig,
 			CryptoContext context,
 			SlackClient slack,
 			WatchService watcher
-		) : base( logger ) {
+		) : base( logger, intConfig, slack ) {
 			this.config = config;
 			this.context = context;
-			this.slack = slack;
 			this.watcher = watcher;
 		}
 
@@ -112,17 +110,17 @@ namespace CryptoWatch.Services {
 				if( current.Value <= current.BuyBoundary ) {
 					var amount = current.NotifiedAt - current.Value;
 					if( cash.Value > 50m ) {
-						await this.slack.SendMessageAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
+						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}", $"Buy {current.Symbol}" );
 						base.Logger.LogWarning( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C}" );
 						// assume the buy happens and reduce cash
 						cash.Amount -= amount;
 					} else {
-						await this.slack.SendMessageAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
+						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
 						base.Logger.LogError( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C} *** not enough cash ***" );
 					}
 				} else {
 					var amount = current.Value - current.NotifiedAt;
-					await this.slack.SendMessageAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})" );
+					await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
 					base.Logger.LogWarning( $"\t{amount,7:C} SELL {current.Symbol,-4} ({current.Name + ")",-22}" );
 					// assume the sell happens and increase cash
 					cash.Amount += amount;

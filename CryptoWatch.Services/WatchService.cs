@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using CoinMarketCap;
 using CoinMarketCap.Models.Cryptocurrency;
 using CryptoWatch.Core.Config;
-using CryptoWatch.Core.Utilities;
 using CryptoWatch.Entities.Contexts;
 using CryptoWatch.Entities.Domains;
 using CryptoWatch.Services.Mappers;
@@ -30,9 +29,7 @@ namespace CryptoWatch.Services {
 
 		private readonly GeneralConfiguration generalConfig;
 		private readonly CoinMarketCapConfiguration cmcConfig;
-		private readonly IntegrationsConfiguration intConfig;
 		private readonly CryptoContext context;
-		private readonly SlackClient slack;
 
 		private FileSystemWatcher watcher;
 		private CoinMarketCapClient client;
@@ -53,12 +50,10 @@ namespace CryptoWatch.Services {
 			CoinMarketCapConfiguration cmcConfig,
 			IntegrationsConfiguration intConfig,
 			CryptoContext context,
-			SlackClient slack ) : base( logger ) {
+			SlackClient slack ) : base( logger, intConfig, slack ) {
 			this.generalConfig = generalConfig;
 			this.cmcConfig = cmcConfig;
-			this.intConfig = intConfig;
 			this.context = context;
-			this.slack = slack;
 		}
 
 		#endregion
@@ -144,13 +139,12 @@ namespace CryptoWatch.Services {
 		private async Task<List<FileTransaction>> processFileAsync( string fileName, CancellationToken cancellationToken ) {
 			var fileTransactions = this.readFile( fileName );
 			var newTransactions = fileTransactions.Where( ft => !this.context.Transactions.Any( t => t.ExternalId.Equals( ft.Id, StringComparison.OrdinalIgnoreCase ) ) ).ToList( );
-			await this.slack.SendMessageAsync( $"@here {fileName} modified: {fileTransactions.Count} transactions, {newTransactions.Count} new" );
+			await base.SendNotificationAsync( $"@here {fileName} modified: {fileTransactions.Count} transactions, {newTransactions.Count} new", "Transactions Loaded" );
 			List<CryptoCurrency> assets;
 			try {
 				assets = await this.createAssetsAsync( newTransactions, cancellationToken );
 			} catch( Exception ex ) {
 				this.Logger.LogError( ex, "Failed to load assets" );
-				await this.slack.SendMessageAsync( $@"here failed to load assets: {ex.Message}" );
 				return fileTransactions;
 			}
 
@@ -272,12 +266,12 @@ namespace CryptoWatch.Services {
 		}
 
 		private async Task updateGoogleSheets( List<FileTransaction> transactions, CancellationToken cancellationToken ) {
-			if( !this.intConfig.GoogleSheetsEnabled ) {
+			if( !base.Integrations.GoogleSheetsEnabled ) {
 				base.Logger.LogDebug( "Google Sheets not enabled." );
 				return;
 			}
 
-			if( string.IsNullOrWhiteSpace( this.intConfig.GoogleSheetsId ) ) {
+			if( string.IsNullOrWhiteSpace( base.Integrations.GoogleSheetsId ) ) {
 				base.Logger.LogError( "Google Sheets integration is enabled, but spreadsheet ID is not set." );
 				return;
 			}
@@ -349,7 +343,7 @@ namespace CryptoWatch.Services {
 			base.Logger.LogInformation( $"{row - 1} USD transactions generated" );
 
 			var valueRange = new ValueRange { Values = values };
-			var request = service.Spreadsheets.Values.Update( valueRange, this.intConfig.GoogleSheetsId, "USD!A1:D" );
+			var request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, "USD!A1:D" );
 			request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
 			await request.ExecuteAsync( cancellationToken );
 		}
@@ -359,12 +353,12 @@ namespace CryptoWatch.Services {
 			var balances = await this.context.Balances.Where( b => !b.Exclude ).ToListAsync( cancellationToken ); // cash is excluded and we handle that differently, anyway
 			for( var i = 0; i < balances.Count; i++ ) {
 				var asset = balances[ i ];
-				var selected = transactions.Where(t => t.OriginCurrency.Equals(asset.Symbol, StringComparison.OrdinalIgnoreCase) || t.DestinationCurrency.Equals(asset.Symbol, StringComparison.OrdinalIgnoreCase)).ToList();
+				var selected = transactions.Where( t => t.OriginCurrency.Equals( asset.Symbol, StringComparison.OrdinalIgnoreCase ) || t.DestinationCurrency.Equals( asset.Symbol, StringComparison.OrdinalIgnoreCase ) ).ToList( );
 				var balanceValues = new List<IList<object>>( );
 				var buyValues = new List<IList<object>>( );
 				var sellValues = new List<IList<object>>( );
 				int balanceCount = 1, buyCount = 1, sellCount = 1;
-				base.Logger.LogInformation($"Processing {selected.Count} transactions for {asset.Symbol}");
+				base.Logger.LogInformation( $"Processing {selected.Count} transactions for {asset.Symbol}" );
 				foreach( var current in selected ) {
 					// header row, so things start on line 2
 					var balancePrice = $"=C{balanceCount + 1}/D{balanceCount + 1}";
@@ -420,7 +414,7 @@ namespace CryptoWatch.Services {
 					// all transactions
 					base.Logger.LogInformation( $"Writing {balanceValues.Count} transactions for {asset.Symbol}" );
 					valueRange = new ValueRange { Values = balanceValues };
-					request = service.Spreadsheets.Values.Update( valueRange, this.intConfig.GoogleSheetsId, $"{asset.Symbol}!A2:E" );
+					request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!A2:E" );
 					request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
 					await request.ExecuteAsync( cancellationToken );
 				}
@@ -428,7 +422,7 @@ namespace CryptoWatch.Services {
 				if( buyValues.Any( ) ) {
 					base.Logger.LogInformation( $"Writing {buyValues.Count} buy transactions for {asset.Symbol}" );
 					valueRange = new ValueRange { Values = buyValues };
-					request = service.Spreadsheets.Values.Update( valueRange, this.intConfig.GoogleSheetsId, $"{asset.Symbol}!G2:J" );
+					request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!G2:J" );
 					request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
 					await request.ExecuteAsync( cancellationToken );
 				}
@@ -437,7 +431,7 @@ namespace CryptoWatch.Services {
 					continue;
 				base.Logger.LogInformation( $"Writing {sellValues.Count} sell transactions for {asset.Symbol}" );
 				valueRange = new ValueRange { Values = sellValues };
-				request = service.Spreadsheets.Values.Update( valueRange, this.intConfig.GoogleSheetsId, $"{asset.Symbol}!L2:O" );
+				request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!L2:O" );
 				request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
 				await request.ExecuteAsync( cancellationToken );
 			}

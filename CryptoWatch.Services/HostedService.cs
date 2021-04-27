@@ -1,12 +1,21 @@
-﻿using System.Threading;
+﻿using System;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using CryptoWatch.Core.Config;
+using CryptoWatch.Core.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using PushBulletSharp.Core;
+using PushBulletSharp.Core.Models.Requests;
+using Slack.Webhooks;
 
 namespace CryptoWatch.Services {
 	public abstract class HostedService : IHostedService {
 		#region Member Variables
 
+		private readonly IntegrationsConfiguration config;
+		private readonly SlackClient slack;
 		private Task executingTask;
 		private CancellationTokenSource cts;
 
@@ -14,8 +23,14 @@ namespace CryptoWatch.Services {
 
 		#region Constructor
 
-		protected HostedService( ILogger logger ) {
+		protected HostedService(
+			ILogger logger,
+			IntegrationsConfiguration config,
+			SlackClient slack
+		) {
 			this.Logger = logger;
+			this.config = config;
+			this.slack = slack;
 		}
 
 		#endregion
@@ -28,6 +43,8 @@ namespace CryptoWatch.Services {
 		protected abstract string ServiceName { get; }
 
 		protected ILogger Logger { get; }
+
+		protected IntegrationsConfiguration Integrations { get; }
 
 		#endregion
 
@@ -72,6 +89,52 @@ namespace CryptoWatch.Services {
 		/// Derived classes should implement this to start the long-running method.
 		/// </summary>
 		protected abstract Task ExecuteAsync( CancellationToken cancellationToken );
+
+		protected async Task SendNotificationAsync( string message, string title = "CryptoWatch" ) {
+			if( this.config.SlackEnabled ) {
+				await this.sendSlackNotificationAsync( message );
+			}
+
+			if( this.config.PushbulletEnabled ) {
+				await this.sendPushbulletNotificationAsync( message, title );
+			}
+		}
+
+		private async Task sendSlackNotificationAsync( string message ) {
+			if( this.config.Slack.Contains( ".slack.com/", StringComparison.OrdinalIgnoreCase ) ) {
+				try {
+					await this.slack.SendMessageAsync( message );
+				} catch( Exception ex ) {
+					this.Logger.LogError( ex, "Failed to send Slack message." );
+				}
+			} else {
+				this.Logger.LogError( "Slack notifications are enabled, but an invalid URL is specified. Expecting it to contain 'slack.com/'." );
+			}
+		}
+
+		private async Task sendPushbulletNotificationAsync( string message, string title ) {
+			if( string.IsNullOrWhiteSpace( this.config.PushbulletToken ) ) {
+				this.Logger.LogError( "Pushbullet notifications are enabled, but no token was specified." );
+				return;
+			}
+
+			var client = new PushBulletClient( this.config.PushbulletToken );
+			try {
+				var user = await client.CurrentUsersInformation( );
+				if( user == null ) {
+					this.Logger.LogError( "Failed to retrieve the Pushbullet current user." );
+				}
+
+				var request = new PushNoteRequest {
+					Email = user.Email,
+					Title = title,
+					Body = message
+				};
+				await client.PushNote( request );
+			} catch( Exception ex ) {
+				this.Logger.LogError( ex, "Failed to send Pushbullet notification." );
+			}
+		}
 
 		#endregion
 

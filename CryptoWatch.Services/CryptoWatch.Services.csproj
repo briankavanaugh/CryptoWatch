@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\CoinMarketCap\CoinMarketCap\CoinMarketCap.csproj" />
+    <ProjectReference Include="..\..\PushbulletSharp.Core\PushBulletSharp.Core\PushBulletSharp.Core.csproj" />
     <ProjectReference Include="..\CryptoWatch.Core\CryptoWatch.Core.csproj" />
     <ProjectReference Include="..\CryptoWatch.Entities\CryptoWatch.Entities.csproj" />
   </ItemGroup>

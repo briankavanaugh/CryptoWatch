@@ -5,13 +5,15 @@ VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch", "CryptoWatch\CryptoWatch.csproj", "{D7E33A2C-54B5-4F5F-BBBD-22D578676558}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoWatch.Entities", "CryptoWatch.Entities\CryptoWatch.Entities.csproj", "{930AA07B-9FE8-44FF-A936-303D7A3CDD2D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch.Entities", "CryptoWatch.Entities\CryptoWatch.Entities.csproj", "{930AA07B-9FE8-44FF-A936-303D7A3CDD2D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoWatch.Core", "CryptoWatch.Core\CryptoWatch.Core.csproj", "{40A194CA-345F-447B-AD1B-CDEADC9789D4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch.Core", "CryptoWatch.Core\CryptoWatch.Core.csproj", "{40A194CA-345F-447B-AD1B-CDEADC9789D4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoWatch.Services", "CryptoWatch.Services\CryptoWatch.Services.csproj", "{B1CEC19C-1AAD-450E-BEAC-3938B1F4A455}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch.Services", "CryptoWatch.Services\CryptoWatch.Services.csproj", "{B1CEC19C-1AAD-450E-BEAC-3938B1F4A455}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoinMarketCap", "..\CoinMarketCap\CoinMarketCap\CoinMarketCap.csproj", "{FBA68F18-025D-44CB-96A0-479A94E25090}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PushBulletSharp.Core", "..\PushbulletSharp.Core\PushBulletSharp.Core\PushBulletSharp.Core.csproj", "{20E7D37C-F560-432A-AC46-74DDDF5CCF51}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,6 +41,10 @@ Global
 		{FBA68F18-025D-44CB-96A0-479A94E25090}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FBA68F18-025D-44CB-96A0-479A94E25090}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FBA68F18-025D-44CB-96A0-479A94E25090}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20E7D37C-F560-432A-AC46-74DDDF5CCF51}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20E7D37C-F560-432A-AC46-74DDDF5CCF51}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20E7D37C-F560-432A-AC46-74DDDF5CCF51}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20E7D37C-F560-432A-AC46-74DDDF5CCF51}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

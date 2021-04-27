@@ -297,13 +297,18 @@ namespace CryptoWatch.Services {
 				this.UpdatingSheets = true; // we don't want multiple updates running
 
 			transactions = transactions.OrderBy( t => t.Date ).ToList( );
+			var list = await this.processAsync( transactions, cancellationToken );
 			// cash has different processing requirements than the others
-			await this.processUsdAsync( transactions, service, cancellationToken );
-			await this.processAsync( transactions, service, cancellationToken );
+			var cash = this.processUsd(transactions );
+			list.Add( cash );
+			base.Logger.LogInformation( "Starting batch update" );
+			var requestBody = new BatchUpdateValuesRequest { ValueInputOption = "USER_ENTERED", Data = list };
+			var request = service.Spreadsheets.Values.BatchUpdate( requestBody, base.Integrations.GoogleSheetsId );
+			await request.ExecuteAsync( cancellationToken );
 			base.Logger.LogInformation( "Finished updating Google Sheets." );
 		}
 
-		private async Task processUsdAsync( List<FileTransaction> transactions, SheetsService service, CancellationToken cancellationToken ) {
+		private ValueRange processUsd( IReadOnlyList<FileTransaction> transactions ) {
 			var values = new List<IList<object>>( );
 			var row = 1;
 			// process USD sheet
@@ -342,15 +347,13 @@ namespace CryptoWatch.Services {
 
 			base.Logger.LogInformation( $"{row - 1} USD transactions generated" );
 
-			var valueRange = new ValueRange { Values = values };
-			var request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, "USD!A1:D" );
-			request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
-			await request.ExecuteAsync( cancellationToken );
+			return new ValueRange { Range = "USD!A1:D", Values = values };
 		}
 
-		private async Task processAsync( List<FileTransaction> transactions, SheetsService service, CancellationToken cancellationToken ) {
+		private async Task<List<ValueRange>> processAsync( IReadOnlyCollection<FileTransaction> transactions, CancellationToken cancellationToken ) {
 			// only process those with a balance
 			var balances = await this.context.Balances.Where( b => !b.Exclude ).ToListAsync( cancellationToken ); // cash is excluded and we handle that differently, anyway
+			var data = new List<ValueRange>( );
 			for( var i = 0; i < balances.Count; i++ ) {
 				var asset = balances[ i ];
 				var selected = transactions.Where( t => t.OriginCurrency.Equals( asset.Symbol, StringComparison.OrdinalIgnoreCase ) || t.DestinationCurrency.Equals( asset.Symbol, StringComparison.OrdinalIgnoreCase ) ).ToList( );
@@ -409,32 +412,27 @@ namespace CryptoWatch.Services {
 				}
 
 				ValueRange valueRange;
-				SpreadsheetsResource.ValuesResource.UpdateRequest request;
 				if( balanceValues.Any( ) ) {
 					// all transactions
 					base.Logger.LogInformation( $"Writing {balanceValues.Count} transactions for {asset.Symbol}" );
-					valueRange = new ValueRange { Values = balanceValues };
-					request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!A2:E" );
-					request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
-					await request.ExecuteAsync( cancellationToken );
+					valueRange = new ValueRange { Range = $"{asset.Symbol}!A2:E", Values = balanceValues };
+					data.Add( valueRange );
 				}
 
 				if( buyValues.Any( ) ) {
 					base.Logger.LogInformation( $"Writing {buyValues.Count} buy transactions for {asset.Symbol}" );
-					valueRange = new ValueRange { Values = buyValues };
-					request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!G2:J" );
-					request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
-					await request.ExecuteAsync( cancellationToken );
+					valueRange = new ValueRange { Range = $"{asset.Symbol}!G2:J", Values = buyValues };
+					data.Add( valueRange );
 				}
 
 				if( !sellValues.Any( ) )
 					continue;
 				base.Logger.LogInformation( $"Writing {sellValues.Count} sell transactions for {asset.Symbol}" );
-				valueRange = new ValueRange { Values = sellValues };
-				request = service.Spreadsheets.Values.Update( valueRange, base.Integrations.GoogleSheetsId, $"{asset.Symbol}!L2:O" );
-				request.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
-				await request.ExecuteAsync( cancellationToken );
+				valueRange = new ValueRange { Range = $"{asset.Symbol}!L2:O", Values = sellValues };
+				data.Add( valueRange );
 			}
+
+			return data;
 		}
 
 		private async Task<SheetsService> initializeSheetsAsync( CancellationToken cancellationToken ) {
@@ -443,22 +441,27 @@ namespace CryptoWatch.Services {
 				return null;
 			}
 
-			await using var stream = new FileStream( "credentials.json", FileMode.Open, FileAccess.Read );
-			// The file token.json stores the user's access and refresh tokens, and is created
-			// automatically when the authorization flow completes for the first time.
-			const string credPath = "token.json";
-			var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-			                                                                   GoogleClientSecrets.Load( stream ).Secrets,
-			                                                                   scopes,
-			                                                                   "user",
-			                                                                   cancellationToken,
-			                                                                   new FileDataStore( credPath, true ) );
-			base.Logger.LogInformation( $"Credential file saved to: {credPath}" );
+			try {
+				await using var stream = new FileStream( "credentials.json", FileMode.Open, FileAccess.Read );
+				// The file token.json stores the user's access and refresh tokens, and is created
+				// automatically when the authorization flow completes for the first time.
+				const string credPath = "token.json";
+				var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+				                                                                   GoogleClientSecrets.Load( stream ).Secrets,
+				                                                                   scopes,
+				                                                                   "user",
+				                                                                   cancellationToken,
+				                                                                   new FileDataStore( credPath, true ) );
+				base.Logger.LogInformation( $"Credential file saved to: {credPath}" );
 
-			return new SheetsService( new BaseClientService.Initializer {
-				HttpClientInitializer = credential,
-				ApplicationName = "CryptoWatch"
-			} );
+				return new SheetsService( new BaseClientService.Initializer {
+					HttpClientInitializer = credential,
+					ApplicationName = "CryptoWatch"
+				} );
+			} catch( Exception ex ) {
+				base.Logger.LogError( ex, "Failed to initialize service." );
+				return null;
+			}
 		}
 
 		#endregion

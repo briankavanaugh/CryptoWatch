@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CryptoWatch.Core.Config;
@@ -14,7 +13,6 @@ namespace CryptoWatch.Services {
 	public abstract class HostedService : IHostedService {
 		#region Member Variables
 
-		private readonly IntegrationsConfiguration config;
 		private readonly SlackClient slack;
 		private Task executingTask;
 		private CancellationTokenSource cts;
@@ -29,7 +27,7 @@ namespace CryptoWatch.Services {
 			SlackClient slack
 		) {
 			this.Logger = logger;
-			this.config = config;
+			this.Integrations = config;
 			this.slack = slack;
 		}
 
@@ -91,17 +89,17 @@ namespace CryptoWatch.Services {
 		protected abstract Task ExecuteAsync( CancellationToken cancellationToken );
 
 		protected async Task SendNotificationAsync( string message, string title = "CryptoWatch" ) {
-			if( this.config.SlackEnabled ) {
+			if( this.Integrations.SlackEnabled ) {
 				await this.sendSlackNotificationAsync( message );
 			}
 
-			if( this.config.PushbulletEnabled ) {
+			if( this.Integrations.PushbulletEnabled ) {
 				await this.sendPushbulletNotificationAsync( message, title );
 			}
 		}
 
 		private async Task sendSlackNotificationAsync( string message ) {
-			if( this.config.Slack.Contains( ".slack.com/", StringComparison.OrdinalIgnoreCase ) ) {
+			if( this.Integrations.Slack.Contains( ".slack.com/", StringComparison.OrdinalIgnoreCase ) ) {
 				try {
 					await this.slack.SendMessageAsync( message );
 				} catch( Exception ex ) {
@@ -113,12 +111,12 @@ namespace CryptoWatch.Services {
 		}
 
 		private async Task sendPushbulletNotificationAsync( string message, string title ) {
-			if( string.IsNullOrWhiteSpace( this.config.PushbulletToken ) ) {
+			if( string.IsNullOrWhiteSpace( this.Integrations.PushbulletToken ) ) {
 				this.Logger.LogError( "Pushbullet notifications are enabled, but no token was specified." );
 				return;
 			}
 
-			var client = new PushBulletClient( this.config.PushbulletToken );
+			var client = new PushBulletClient( this.Integrations.PushbulletToken );
 			try {
 				var user = await client.CurrentUsersInformation( );
 				if( user == null ) {

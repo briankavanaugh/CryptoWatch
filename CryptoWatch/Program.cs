@@ -57,6 +57,9 @@ namespace CryptoWatch {
 				    var integrations = new IntegrationsConfiguration( );
 				    context.Configuration.Bind( "Integrations", integrations );
 				    services.AddSingleton( integrations );
+				    Log.Logger.Information( $"Slack notifications enabled: {integrations.SlackEnabled}" );
+				    Log.Logger.Information( $"Pushbullet notifications enabled: {integrations.PushbulletEnabled}" );
+				    Log.Logger.Information( $"Google Sheets update enabled: {integrations.GoogleSheetsEnabled}" );
 
 				    var slack = new SlackClient( integrations.Slack );
 				    services.AddSingleton( slack );

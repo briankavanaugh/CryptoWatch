@@ -3,5 +3,6 @@
 	public sealed class GeneralConfiguration
 	{
 		public string WatchDirectory { get; set; }
+		public decimal CashFloor { get; set; }
 	}
 }

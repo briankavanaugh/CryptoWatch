@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CryptoWatch.Core.Config;
 using CryptoWatch.Core.Utilities;
+using CryptoWatch.Entities.Contexts;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using PushBulletSharp.Core;
@@ -23,11 +24,17 @@ namespace CryptoWatch.Services {
 
 		protected HostedService(
 			ILogger logger,
+			CryptoContext context,
 			IntegrationsConfiguration config,
+			GeneralConfiguration genConfig,
+			CoinMarketCapConfiguration cmcConfig,
 			SlackClient slack
 		) {
 			this.Logger = logger;
-			this.Integrations = config;
+			this.Context = context;
+			this.IntegrationSettings = config;
+			this.GeneralSettings = genConfig;
+			this.CoinMarketCapSettings = cmcConfig;
 			this.slack = slack;
 		}
 
@@ -42,7 +49,13 @@ namespace CryptoWatch.Services {
 
 		protected ILogger Logger { get; }
 
-		protected IntegrationsConfiguration Integrations { get; }
+		protected IntegrationsConfiguration IntegrationSettings { get; }
+
+		protected GeneralConfiguration GeneralSettings { get; }
+
+		protected CoinMarketCapConfiguration CoinMarketCapSettings { get; }
+
+		protected CryptoContext Context { get; }
 
 		#endregion
 
@@ -89,17 +102,17 @@ namespace CryptoWatch.Services {
 		protected abstract Task ExecuteAsync( CancellationToken cancellationToken );
 
 		protected async Task SendNotificationAsync( string message, string title = "CryptoWatch" ) {
-			if( this.Integrations.SlackEnabled ) {
+			if( this.IntegrationSettings.SlackEnabled ) {
 				await this.sendSlackNotificationAsync( message );
 			}
 
-			if( this.Integrations.PushbulletEnabled ) {
+			if( this.IntegrationSettings.PushbulletEnabled ) {
 				await this.sendPushbulletNotificationAsync( message, title );
 			}
 		}
 
 		private async Task sendSlackNotificationAsync( string message ) {
-			if( this.Integrations.Slack.Contains( ".slack.com/", StringComparison.OrdinalIgnoreCase ) ) {
+			if( this.IntegrationSettings.Slack.Contains( ".slack.com/", StringComparison.OrdinalIgnoreCase ) ) {
 				try {
 					await this.slack.SendMessageAsync( message );
 				} catch( Exception ex ) {
@@ -111,16 +124,17 @@ namespace CryptoWatch.Services {
 		}
 
 		private async Task sendPushbulletNotificationAsync( string message, string title ) {
-			if( string.IsNullOrWhiteSpace( this.Integrations.PushbulletToken ) ) {
+			if( string.IsNullOrWhiteSpace( this.IntegrationSettings.PushbulletToken ) ) {
 				this.Logger.LogError( "Pushbullet notifications are enabled, but no token was specified." );
 				return;
 			}
 
-			var client = new PushBulletClient( this.Integrations.PushbulletToken );
+			var client = new PushBulletClient( this.IntegrationSettings.PushbulletToken );
 			try {
 				var user = await client.CurrentUsersInformation( );
 				if( user == null ) {
 					this.Logger.LogError( "Failed to retrieve the Pushbullet current user." );
+					return;
 				}
 
 				var request = new PushNoteRequest {
@@ -135,6 +149,5 @@ namespace CryptoWatch.Services {
 		}
 
 		#endregion
-
 	}
 }

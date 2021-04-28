@@ -16,8 +16,6 @@ namespace CryptoWatch.Services {
 	public sealed class CoinMarketCapService : HostedService, IDisposable {
 		#region Member Variables
 
-		private readonly CoinMarketCapConfiguration config;
-		private readonly CryptoContext context;
 		private readonly WatchService watcher;
 
 		private CoinMarketCapClient client;
@@ -34,12 +32,11 @@ namespace CryptoWatch.Services {
 			ILogger<CoinMarketCapService> logger,
 			CoinMarketCapConfiguration config,
 			IntegrationsConfiguration intConfig,
+			GeneralConfiguration genConfig,
 			CryptoContext context,
 			SlackClient slack,
 			WatchService watcher
-		) : base( logger, intConfig, slack ) {
-			this.config = config;
-			this.context = context;
+		) : base( logger, context, intConfig, genConfig, config, slack ) {
 			this.watcher = watcher;
 		}
 
@@ -56,9 +53,8 @@ namespace CryptoWatch.Services {
 
 		protected override async Task ExecuteAsync( CancellationToken cancellationToken ) {
 			await this.watcher.StartAsync( cancellationToken );
-			this.Logger.LogInformation( $"{this.ServiceName} watcher instance: {this.watcher.InstanceId}" );
-			this.client = new CoinMarketCapClient( this.config.ApiKey );
-			client.HttpClient.BaseAddress = new Uri( this.config.BaseUrl );
+			this.client = new CoinMarketCapClient( base.CoinMarketCapSettings.ApiKey );
+			client.HttpClient.BaseAddress = new Uri( base.CoinMarketCapSettings.BaseUrl );
 			while( true ) {
 				if( !this.initialized ) {
 					await this.loadInitialData( cancellationToken );
@@ -82,7 +78,7 @@ namespace CryptoWatch.Services {
 			}
 
 			if( this.watcher.Changed || this.assets == null ) {
-				this.assets = await this.context.Balances.ToListAsync( cancellationToken );
+				this.assets = await base.Context.Balances.ToListAsync( cancellationToken );
 				this.watcher.Changed = false;
 			}
 
@@ -109,21 +105,30 @@ namespace CryptoWatch.Services {
 
 				if( current.Value <= current.BuyBoundary ) {
 					var amount = current.NotifiedAt - current.Value;
-					if( cash.Value > 50m ) {
+					if( cash.Value - amount > base.GeneralSettings.CashFloor ) {
 						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}", $"Buy {current.Symbol}" );
-						base.Logger.LogWarning( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C}" );
-						// assume the buy happens and reduce cash
-						cash.Amount -= amount;
+						base.Logger.LogWarning( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
+						// assume the buy happens and adjust balances
+						amount = Math.Floor( amount );
+						cash.Amount -= Math.Floor( amount ); // rough inclusion of fee
+						base.Logger.LogInformation($"\t\tCurrent shares: {current.Amount:N6}");
+						current.Amount += amount / current.Price;
+						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
+						base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
 					} else {
 						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
-						base.Logger.LogError( $"\t{amount,7:C} BUY  {current.Symbol,-4} ({current.Name + ")",-22} cash: {cash.Value,7:C} *** not enough cash ***" );
+						base.Logger.LogError( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
 					}
 				} else {
 					var amount = current.Value - current.NotifiedAt;
 					await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
-					base.Logger.LogWarning( $"\t{amount,7:C} SELL {current.Symbol,-4} ({current.Name + ")",-22}" );
-					// assume the sell happens and increase cash
-					cash.Amount += amount;
+					base.Logger.LogWarning( $"\t\t{amount:C} SELL {current.Symbol} ({current.Name})" );
+					// assume the sell happens and adjust balances
+					cash.Amount += Math.Ceiling( amount ); // rough inclusion of fee
+					base.Logger.LogInformation($"\t\tCurrent shares: {current.Amount:N6}");
+					current.Amount -= amount / current.Price;
+					base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
+					base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
 				}
 
 				// prevent multiple notifications at roughly the same value
@@ -150,7 +155,7 @@ namespace CryptoWatch.Services {
 					Slug = value.Slug,
 					Name = value.Name
 				};
-				await this.context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
+				await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
 			}
 
 			// add and exclude USD and UPCO2
@@ -161,7 +166,7 @@ namespace CryptoWatch.Services {
 				Name = "US Dollar",
 				Exclude = true
 			};
-			await this.context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
+			await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
 
 			crypto = new CryptoCurrency {
 				Symbol = "UPCO2",
@@ -170,9 +175,9 @@ namespace CryptoWatch.Services {
 				Name = "Universal Carbon",
 				Exclude = true
 			};
-			await this.context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
+			await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
 
-			await this.context.SaveChangesAsync( cancellationToken );
+			await base.Context.SaveChangesAsync( cancellationToken );
 		}
 
 		#endregion

@@ -27,10 +27,6 @@ namespace CryptoWatch.Services {
 	public sealed class WatchService : HostedService, IDisposable {
 		#region Member Variables
 
-		private readonly GeneralConfiguration generalConfig;
-		private readonly CoinMarketCapConfiguration cmcConfig;
-		private readonly CryptoContext context;
-
 		private FileSystemWatcher watcher;
 		private CoinMarketCapClient client;
 		private readonly object processingLock = new( );
@@ -50,11 +46,7 @@ namespace CryptoWatch.Services {
 			CoinMarketCapConfiguration cmcConfig,
 			IntegrationsConfiguration intConfig,
 			CryptoContext context,
-			SlackClient slack ) : base( logger, intConfig, slack ) {
-			this.generalConfig = generalConfig;
-			this.cmcConfig = cmcConfig;
-			this.context = context;
-		}
+			SlackClient slack ) : base( logger, context, intConfig, generalConfig, cmcConfig, slack ) { }
 
 		#endregion
 
@@ -66,8 +58,6 @@ namespace CryptoWatch.Services {
 		public bool Processing { get; private set; }
 
 		public bool UpdatingSheets { get; private set; }
-
-		public Guid InstanceId { get; } = Guid.NewGuid( );
 
 		public bool Changed {
 			get {
@@ -112,13 +102,12 @@ namespace CryptoWatch.Services {
 		#region Methods
 
 		protected override async Task ExecuteAsync( CancellationToken cancellationToken ) {
-			this.Logger.LogInformation( $"{this.ServiceName} instance: {this.InstanceId}" );
-			this.client = new CoinMarketCapClient( this.cmcConfig.ApiKey );
-			client.HttpClient.BaseAddress = new Uri( this.cmcConfig.BaseUrl );
-			base.Logger.LogInformation( $"Starting file watcher for {this.generalConfig.WatchDirectory}" );
+			this.client = new CoinMarketCapClient( base.CoinMarketCapSettings.ApiKey );
+			client.HttpClient.BaseAddress = new Uri( base.CoinMarketCapSettings.BaseUrl );
+			base.Logger.LogInformation( $"Starting file watcher for {base.GeneralSettings.WatchDirectory}" );
 			// create directory if it doesn't exist
-			Directory.CreateDirectory( this.generalConfig.WatchDirectory );
-			this.watcher = new FileSystemWatcher( this.generalConfig.WatchDirectory ) {
+			Directory.CreateDirectory( base.GeneralSettings.WatchDirectory );
+			this.watcher = new FileSystemWatcher( base.GeneralSettings.WatchDirectory ) {
 				NotifyFilter = NotifyFilters.Attributes
 				               | NotifyFilters.CreationTime
 				               | NotifyFilters.DirectoryName
@@ -138,8 +127,8 @@ namespace CryptoWatch.Services {
 
 		private async Task<List<FileTransaction>> processFileAsync( string fileName, CancellationToken cancellationToken ) {
 			var fileTransactions = this.readFile( fileName );
-			var newTransactions = fileTransactions.Where( ft => !this.context.Transactions.Any( t => t.ExternalId.Equals( ft.Id, StringComparison.OrdinalIgnoreCase ) ) ).ToList( );
-			await base.SendNotificationAsync( $"@here {fileName} modified: {fileTransactions.Count} transactions, {newTransactions.Count} new", "Transactions Loaded" );
+			var newTransactions = fileTransactions.Where( ft => !base.Context.Transactions.Any( t => t.ExternalId.Equals( ft.Id, StringComparison.OrdinalIgnoreCase ) ) ).ToList( );
+			base.Logger.LogInformation( $"Transactions loaded: {fileTransactions.Count} transactions, {newTransactions.Count} new" );
 			List<CryptoCurrency> assets;
 			try {
 				assets = await this.createAssetsAsync( newTransactions, cancellationToken );
@@ -166,7 +155,7 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await this.context.Transactions.AddAsync( intx, cancellationToken );
+						await base.Context.Transactions.AddAsync( intx, cancellationToken );
 
 						var outtx = new Transaction {
 							Amount = current.OriginAmount * -1m,
@@ -178,7 +167,7 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await this.context.Transactions.AddAsync( outtx, cancellationToken );
+						await base.Context.Transactions.AddAsync( outtx, cancellationToken );
 						count += 2;
 
 						break;
@@ -194,7 +183,7 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await this.context.Transactions.AddAsync( intx, cancellationToken );
+						await base.Context.Transactions.AddAsync( intx, cancellationToken );
 						count++;
 
 						break;
@@ -210,7 +199,7 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await this.context.Transactions.AddAsync( outtx, cancellationToken );
+						await base.Context.Transactions.AddAsync( outtx, cancellationToken );
 						count++;
 
 						break;
@@ -218,7 +207,7 @@ namespace CryptoWatch.Services {
 				}
 			}
 
-			await this.context.SaveChangesAsync( cancellationToken );
+			await base.Context.SaveChangesAsync( cancellationToken );
 			if( count > 0 )
 				this.Changed = true;
 			this.Logger.LogInformation( $"{count} transactions saved to database." );
@@ -227,7 +216,7 @@ namespace CryptoWatch.Services {
 		}
 
 		private async Task<List<CryptoCurrency>> createAssetsAsync( IReadOnlyCollection<FileTransaction> transactions, CancellationToken cancellationToken ) {
-			var assets = await this.context.CryptoCurrencies.ToListAsync( cancellationToken );
+			var assets = await base.Context.CryptoCurrencies.ToListAsync( cancellationToken );
 			var symbols = transactions.Select( t => new { Symbol = t.DestinationCurrency } ).Union( transactions.Select( t => new { Symbol = t.OriginCurrency } ) ).Distinct( );
 			var newSymbols = symbols.Where( s => !assets.Any( a => a.Symbol.Equals( s.Symbol, StringComparison.OrdinalIgnoreCase ) ) ).Select( sym => sym.Symbol ).ToList( );
 			if( !newSymbols.Any( ) )
@@ -248,13 +237,13 @@ namespace CryptoWatch.Services {
 				                       Slug = value.Slug,
 				                       Name = value.Name
 			                       } ) {
-				await this.context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
+				await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
 			}
 
-			await this.context.SaveChangesAsync( cancellationToken );
+			await base.Context.SaveChangesAsync( cancellationToken );
 
 			// reload and return assets
-			return await this.context.CryptoCurrencies.ToListAsync( cancellationToken );
+			return await base.Context.CryptoCurrencies.ToListAsync( cancellationToken );
 		}
 
 		private List<FileTransaction> readFile( string fileName ) {
@@ -266,12 +255,12 @@ namespace CryptoWatch.Services {
 		}
 
 		private async Task updateGoogleSheets( List<FileTransaction> transactions, CancellationToken cancellationToken ) {
-			if( !base.Integrations.GoogleSheetsEnabled ) {
+			if( !base.IntegrationSettings.GoogleSheetsEnabled ) {
 				base.Logger.LogDebug( "Google Sheets not enabled." );
 				return;
 			}
 
-			if( string.IsNullOrWhiteSpace( base.Integrations.GoogleSheetsId ) ) {
+			if( string.IsNullOrWhiteSpace( base.IntegrationSettings.GoogleSheetsId ) ) {
 				base.Logger.LogError( "Google Sheets integration is enabled, but spreadsheet ID is not set." );
 				return;
 			}
@@ -303,7 +292,7 @@ namespace CryptoWatch.Services {
 			list.Add( cash );
 			base.Logger.LogInformation( "Starting batch update" );
 			var requestBody = new BatchUpdateValuesRequest { ValueInputOption = "USER_ENTERED", Data = list };
-			var request = service.Spreadsheets.Values.BatchUpdate( requestBody, base.Integrations.GoogleSheetsId );
+			var request = service.Spreadsheets.Values.BatchUpdate( requestBody, base.IntegrationSettings.GoogleSheetsId );
 			await request.ExecuteAsync( cancellationToken );
 			base.Logger.LogInformation( "Finished updating Google Sheets." );
 		}
@@ -352,7 +341,7 @@ namespace CryptoWatch.Services {
 
 		private async Task<List<ValueRange>> processAsync( IReadOnlyCollection<FileTransaction> transactions, CancellationToken cancellationToken ) {
 			// only process those with a balance
-			var balances = await this.context.Balances.Where( b => !b.Exclude ).ToListAsync( cancellationToken ); // cash is excluded and we handle that differently, anyway
+			var balances = await base.Context.Balances.Where( b => !b.Exclude ).ToListAsync( cancellationToken ); // cash is excluded and we handle that differently, anyway
 			var data = new List<ValueRange>( );
 			for( var i = 0; i < balances.Count; i++ ) {
 				var asset = balances[ i ];

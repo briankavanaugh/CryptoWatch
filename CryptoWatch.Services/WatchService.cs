@@ -231,15 +231,15 @@ namespace CryptoWatch.Services {
 			var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
 
 			base.Logger.LogInformation( $"{response.Data.Count} symbols to add." );
-			foreach( var crypto in from CryptocurrencyWithLatestQuote value in response.Data
-			                       select new CryptoCurrency {
-				                       Symbol = value.Symbol,
-				                       AltSymbol = value.Symbol,
-				                       AddedToExchange = value.DateAdded?.Date,
-				                       ExternalId = value.Id,
-				                       Slug = value.Slug,
-				                       Name = value.Name
-			                       } ) {
+			foreach( var (_, value) in response.Data ) {
+				var crypto = new CryptoCurrency {
+					Symbol = value.Symbol,
+					AltSymbol = value.Symbol,
+					AddedToExchange = value.DateAdded?.Date,
+					ExternalId = value.Id,
+					Slug = value.Slug,
+					Name = value.Name
+				};
 				await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
 			}
 

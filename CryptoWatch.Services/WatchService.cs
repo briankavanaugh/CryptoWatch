@@ -137,7 +137,7 @@ namespace CryptoWatch.Services {
 				return fileTransactions;
 			}
 
-			var count = 0;
+			var @new = new List<Transaction>( );
 			for( var i = 0; i < newTransactions.Count; i++ ) {
 				// anything that is a transfer (buy/sell) creates two transactions (destination = buy, origin = sell)
 				// anything that is an in (transfer in) creates a buy (destination)
@@ -147,7 +147,7 @@ namespace CryptoWatch.Services {
 					case "TRANSFER": {
 						var intx = new Transaction {
 							Amount = current.DestinationAmount,
-							CryptoCurrencyId = assets.First( a => a.Symbol.Equals( current.DestinationCurrency, StringComparison.OrdinalIgnoreCase ) ).Id,
+							CryptoCurrency = assets.First( a => a.Symbol.Equals( current.DestinationCurrency, StringComparison.OrdinalIgnoreCase ) ),
 							Destination = current.Destination,
 							ExternalId = current.Id,
 							Origin = current.Origin,
@@ -155,11 +155,11 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await base.Context.Transactions.AddAsync( intx, cancellationToken );
+						@new.Add( intx );
 
 						var outtx = new Transaction {
 							Amount = current.OriginAmount * -1m,
-							CryptoCurrencyId = assets.First( a => a.Symbol.Equals( current.OriginCurrency, StringComparison.OrdinalIgnoreCase ) ).Id,
+							CryptoCurrency = assets.First( a => a.Symbol.Equals( current.OriginCurrency, StringComparison.OrdinalIgnoreCase ) ),
 							Destination = current.Destination,
 							ExternalId = current.Id,
 							Origin = current.Origin,
@@ -167,15 +167,14 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await base.Context.Transactions.AddAsync( outtx, cancellationToken );
-						count += 2;
+						@new.Add( outtx );
 
 						break;
 					}
 					case "IN": {
 						var intx = new Transaction {
 							Amount = current.DestinationAmount,
-							CryptoCurrencyId = assets.First( a => a.Symbol.Equals( current.DestinationCurrency, StringComparison.OrdinalIgnoreCase ) ).Id,
+							CryptoCurrency = assets.First( a => a.Symbol.Equals( current.DestinationCurrency, StringComparison.OrdinalIgnoreCase ) ),
 							Destination = current.Destination,
 							ExternalId = current.Id,
 							Origin = current.Origin,
@@ -183,15 +182,14 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await base.Context.Transactions.AddAsync( intx, cancellationToken );
-						count++;
+						@new.Add( intx );
 
 						break;
 					}
 					case "OUT": {
 						var outtx = new Transaction {
 							Amount = current.OriginAmount * -1m,
-							CryptoCurrencyId = assets.First( a => a.Symbol.Equals( current.OriginCurrency, StringComparison.OrdinalIgnoreCase ) ).Id,
+							CryptoCurrency = assets.First( a => a.Symbol.Equals( current.OriginCurrency, StringComparison.OrdinalIgnoreCase ) ),
 							Destination = current.Destination,
 							ExternalId = current.Id,
 							Origin = current.Origin,
@@ -199,18 +197,23 @@ namespace CryptoWatch.Services {
 							Type = current.Type,
 							TransactionDate = current.Date
 						};
-						await base.Context.Transactions.AddAsync( outtx, cancellationToken );
-						count++;
+						@new.Add( outtx );
 
 						break;
 					}
 				}
 			}
 
+			await base.Context.Transactions.AddRangeAsync( @new, cancellationToken );
 			await base.Context.SaveChangesAsync( cancellationToken );
-			if( count > 0 )
+			if( @new.Count > 0 )
 				this.Changed = true;
-			this.Logger.LogInformation( $"{count} transactions saved to database." );
+			this.Logger.LogInformation( $"{@new.Count} transactions saved to database:" );
+			for( var i = 0; i < @new.Count; i++ ) {
+				this.Logger.LogInformation( @new[ i ].CryptoCurrency.Symbol.Equals( "USD", StringComparison.OrdinalIgnoreCase )
+					                           ? $"\t\t{@new[ i ].CryptoCurrency.Symbol,-4} {@new[ i ].Amount:C}"
+					                           : $"\t\t{@new[ i ].CryptoCurrency.Symbol,-4} {@new[ i ].Amount:N6}" );
+			}
 
 			return fileTransactions;
 		}

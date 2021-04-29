@@ -93,7 +93,7 @@ namespace CryptoWatch.Services {
 				asset.Price = Convert.ToDecimal( price.Value );
 			}
 
-			assets = this.assets.OrderByDescending( a => a.Amount ).ToList( );
+			assets = this.assets.OrderByDescending( a => a.Value ).ToList( );
 			var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
 			for( var i = 0; i < this.assets.Count; i++ ) {
 				var current = this.assets[ i ];

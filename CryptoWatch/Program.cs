@@ -68,8 +68,8 @@ namespace CryptoWatch {
 				    context.Configuration.Bind( "ConnectionStrings", contexts );
 				    services.AddSingleton( contexts );
 
-				    // add database contexts
-				    services.AddDbContextPool<CryptoContext>( options => options.UseMySql( contexts.Crypto, ServerVersion.AutoDetect( contexts.Crypto ) ) );
+					// add database contexts
+					services.AddDbContextPool<CryptoContext>( options => options.UseMySql( contexts.Crypto, ServerVersion.AutoDetect( contexts.Crypto ), m => { m.EnableStringComparisonTranslations( ); } ) );
 
 				    // add services
 				    services.AddSingleton<WatchService>( );

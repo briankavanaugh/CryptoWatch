@@ -13,13 +13,15 @@ using Microsoft.Extensions.Logging;
 using Slack.Webhooks;
 
 namespace CryptoWatch.Services {
-	public sealed class CoinMarketCapService : HostedService, IDisposable {
+	public sealed class CoinMarketCapService : HostedService, IDisposable, IPriceService {
 		#region Member Variables
 
 		private readonly WatchService watcher;
 
 		private CoinMarketCapClient client;
 		private List<Balance> assets;
+		private readonly object lockObject = new( );
+		private bool processing = false;
 
 		// set to false only if database is empty and symbols need to be added
 		private bool initialized = true;
@@ -52,6 +54,7 @@ namespace CryptoWatch.Services {
 		#region Methods
 
 		protected override async Task ExecuteAsync( CancellationToken cancellationToken ) {
+			this.watcher.PriceService = this;
 			await this.watcher.StartAsync( cancellationToken );
 			this.client = new CoinMarketCapClient( base.CoinMarketCapSettings.ApiKey );
 			client.HttpClient.BaseAddress = new Uri( base.CoinMarketCapSettings.BaseUrl );
@@ -60,7 +63,7 @@ namespace CryptoWatch.Services {
 					await this.loadInitialData( cancellationToken );
 					this.initialized = true;
 				} else {
-					await this.updateBalances( cancellationToken );
+					await ( (IPriceService) this ).UpdateBalances( cancellationToken );
 				}
 
 				base.Logger.LogInformation( "Sleeping for five minutes." );
@@ -71,73 +74,87 @@ namespace CryptoWatch.Services {
 			}
 		}
 
-		private async Task updateBalances( CancellationToken cancellationToken ) {
+		async Task IPriceService.UpdateBalances( CancellationToken cancellationToken ) {
 			while( this.watcher.Processing ) {
 				base.Logger.LogInformation( "File watcher is running. Sleeping for five seconds." );
 				await Task.Delay( TimeSpan.FromSeconds( 5 ), cancellationToken );
 			}
 
-			if( this.watcher.Changed || this.assets == null ) {
-				this.assets = await base.Context.Balances.ToListAsync( cancellationToken );
-				this.watcher.Changed = false;
+			lock( this.lockObject ) {
+				// triggered externally but already running, so don't need to do it again
+				if( this.processing )
+					return;
 			}
 
-			var parameters = new LatestQuoteParameters( );
-			parameters.Symbols.AddRange( this.assets.Where( a => !a.Exclude ).Select( s => s.AltSymbol ) );
-			var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
-			foreach( var (_, value) in response.Data ) {
-				var asset = this.assets.First( a => a.AltSymbol.Equals( value.Symbol, StringComparison.OrdinalIgnoreCase ) );
-				var price = value.Quote[ "USD" ].Price;
-				if( !price.HasValue )
-					continue;
-				asset.Price = Convert.ToDecimal( price.Value );
-			}
+			lock( this.lockObject )
+				this.processing = true;
 
-			assets = this.assets.OrderByDescending( a => a.Value ).ToList( );
-			var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
-			for( var i = 0; i < this.assets.Count; i++ ) {
-				var current = this.assets[ i ];
-				base.Logger.LogInformation( !current.Exclude
-					                           ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / notified at {current.NotifiedAt,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
-					                           : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
-				                          );
-				if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
-					continue;
-
-				if( current.Value <= current.BuyBoundary ) {
-					var amount = current.NotifiedAt - current.Value;
-					if( cash.Value - amount > base.GeneralSettings.CashFloor ) {
-						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}", $"Buy {current.Symbol}" );
-						base.Logger.LogWarning( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
-						// assume the buy happens and adjust balances
-						amount = Math.Floor( amount );
-						cash.Amount -= Math.Floor( amount ); // rough inclusion of fee
-						base.Logger.LogInformation($"\t\tCurrent shares: {current.Amount:N6}");
-						current.Amount += amount / current.Price;
-						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
-						base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
-					} else {
-						await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
-						base.Logger.LogError( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
-					}
-				} else {
-					var amount = current.Value - current.NotifiedAt;
-					await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
-					base.Logger.LogWarning( $"\t\t{amount:C} SELL {current.Symbol} ({current.Name})" );
-					// assume the sell happens and adjust balances
-					cash.Amount += Math.Ceiling( amount ); // rough inclusion of fee
-					base.Logger.LogInformation($"\t\tCurrent shares: {current.Amount:N6}");
-					current.Amount -= amount / current.Price;
-					base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
-					base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
+			try {
+				if( this.watcher.Changed || this.assets == null ) {
+					this.assets = await base.Context.Balances.ToListAsync( cancellationToken );
+					this.watcher.Changed = false;
 				}
 
-				// prevent multiple notifications at roughly the same value
-				current.NotifiedAt = current.Value;
-			}
+				var parameters = new LatestQuoteParameters( );
+				parameters.Symbols.AddRange( this.assets.Where( a => !a.Exclude ).Select( s => s.AltSymbol ) );
+				var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
+				foreach( var (_, value) in response.Data ) {
+					var asset = this.assets.First( a => a.AltSymbol.Equals( value.Symbol, StringComparison.OrdinalIgnoreCase ) );
+					var price = value.Quote[ "USD" ].Price;
+					if( !price.HasValue )
+						continue;
+					asset.Price = Convert.ToDecimal( price.Value );
+				}
 
-			var sum = this.assets.Sum( a => a.Value );
-			base.Logger.LogInformation( $"Account balance: {sum,10:C}" );
+				assets = this.assets.OrderByDescending( a => a.Value ).ToList( );
+				var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
+				for( var i = 0; i < this.assets.Count; i++ ) {
+					var current = this.assets[ i ];
+					base.Logger.LogInformation( !current.Exclude
+												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / notified at {current.NotifiedAt,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
+												   : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
+											  );
+					if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
+						continue;
+
+					if( current.Value <= current.BuyBoundary ) {
+						var amount = current.NotifiedAt - current.Value;
+						if( cash.Value - amount > base.GeneralSettings.CashFloor ) {
+							await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}", $"Buy {current.Symbol}" );
+							base.Logger.LogWarning( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
+							// assume the buy happens and adjust balances
+							amount = Math.Floor( amount );
+							cash.Amount -= Math.Floor( amount ); // rough inclusion of fee
+							base.Logger.LogInformation( $"\t\tCurrent shares: {current.Amount:N6}" );
+							current.Amount += amount / current.Price;
+							base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
+							base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
+						} else {
+							await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
+							base.Logger.LogError( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
+						}
+					} else {
+						var amount = current.Value - current.NotifiedAt;
+						await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
+						base.Logger.LogWarning( $"\t\t{amount:C} SELL {current.Symbol} ({current.Name})" );
+						// assume the sell happens and adjust balances
+						cash.Amount += Math.Ceiling( amount ); // rough inclusion of fee
+						base.Logger.LogInformation( $"\t\tCurrent shares: {current.Amount:N6}" );
+						current.Amount -= amount / current.Price;
+						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
+						base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
+					}
+
+					// prevent multiple notifications at roughly the same value
+					current.NotifiedAt = current.Value;
+				}
+
+				var sum = this.assets.Sum( a => a.Value );
+				base.Logger.LogInformation( $"Account balance: {sum,10:C}" );
+			} finally {
+				lock( this.lockObject )
+					this.processing = false;
+			}
 		}
 
 		private async Task loadInitialData( CancellationToken cancellationToken ) {

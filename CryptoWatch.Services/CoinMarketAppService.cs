@@ -138,7 +138,7 @@ namespace CryptoWatch.Services {
 						await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
 						base.Logger.LogWarning( $"\t\t{amount:C} SELL {current.Symbol} ({current.Name})" );
 						// assume the sell happens and adjust balances
-						cash.Amount += Math.Ceiling( amount ); // rough inclusion of fee
+						cash.Amount += Math.Floor( amount ); // rough inclusion of fee
 						base.Logger.LogInformation( $"\t\tCurrent shares: {current.Amount:N6}" );
 						current.Amount -= amount / current.Price;
 						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );

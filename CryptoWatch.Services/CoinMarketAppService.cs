@@ -25,6 +25,8 @@ namespace CryptoWatch.Services {
 
 		// set to false only if database is empty and symbols need to be added
 		private bool initialized = true;
+		private bool skipNextUpdate;
+		private readonly object skipLock = new( );
 
 		#endregion
 
@@ -49,6 +51,17 @@ namespace CryptoWatch.Services {
 		/// <inheritdoc />
 		protected override string ServiceName { get; } = nameof(CoinMarketCapService);
 
+		public bool SkipNextUpdate {
+			get {
+				lock( this.skipLock )
+					return this.skipNextUpdate;
+			}
+			set {
+				lock( this.skipLock )
+					this.skipNextUpdate = value;
+			}
+		}
+
 		#endregion;
 
 		#region Methods
@@ -59,11 +72,20 @@ namespace CryptoWatch.Services {
 			this.client = new CoinMarketCapClient( base.CoinMarketCapSettings.ApiKey );
 			client.HttpClient.BaseAddress = new Uri( base.CoinMarketCapSettings.BaseUrl );
 			while( true ) {
-				if( !this.initialized ) {
-					await this.loadInitialData( cancellationToken );
-					this.initialized = true;
+				var now = DateTime.Now;
+				if( now.Hour >= 23 || now.Hour < 4 ) {
+					// don't bother with updates or notifications between 11 pm and 4 am
+					base.Logger.LogInformation( "Skipping update." );
 				} else {
-					await ( (IPriceService) this ).UpdateBalances( cancellationToken );
+					if( !this.initialized ) {
+						await this.loadInitialData( cancellationToken );
+						this.initialized = true;
+					} else {
+						if( this.SkipNextUpdate )
+							this.SkipNextUpdate = false;
+						else
+							await ( (IPriceService) this ).UpdateBalances( cancellationToken );
+					}
 				}
 
 				base.Logger.LogInformation( "Sleeping for five minutes." );

@@ -89,8 +89,10 @@ namespace CryptoWatch.Services {
 				var fileTransactions = await this.processFileAsync( e.FullPath, cancellationToken );
 				this.Processing = false; // don't need to wait on writing to Google Sheets 
 				await this.updateGoogleSheets( fileTransactions, cancellationToken );
-				if( this.PriceService != null )
+				if( this.PriceService != null ) {
+					this.PriceService.SkipNextUpdate = true;
 					await this.PriceService.UpdateBalances( cancellationToken );
+				}
 			} catch( Exception ex ) {
 				base.Logger.LogError( ex, "Failed to process file" );
 			} finally {

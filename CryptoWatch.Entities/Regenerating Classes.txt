@@ -1,16 +1,14 @@
-﻿*** Make sure you are in the right folder and use an account that has the correct privileges (like root) and remove OnConfiguring from the context when done ***
+﻿*** Make sure you are in the right project (CryptoWatch.Entities) and use an account that has the correct privileges (like root) and remove OnConfiguring from the context when done ***
 
 Scaffold-DbContext 'server=vitalstatistix.gaulishvillage.home;port=3306;database=Crypto;uid=<user>;password=<password>' Pomelo.EntityFrameworkCore.MySql -ContextDir Contexts -OutputDir Domains -Context CryptoContext -force
 
-Fixing HasCharSet (5.0.0-beta1):
-
-Should be:
-	        modelBuilder.HasCharSet( "utf8" )
-	                    .UseCollation( "utf8_general_ci" );
+CryptoContext
+* Remove default constructor
+* Remove default for Balance/Exclude
+* Remove default for Balance/BalanceTarget
 
 Model 
 * CryptoCurrency - Exclude should be bool?
 * Transaction - ExternalId should be string
-* Balance - Exclude should be bool? / or remove default from view's model
-
-Finally, delete the default, parameterless constructor.
+* Balance - Exclude should be bool
+* Balance - BalanceTarget should be decimal

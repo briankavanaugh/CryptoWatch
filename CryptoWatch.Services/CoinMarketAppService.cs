@@ -133,42 +133,40 @@ namespace CryptoWatch.Services {
 				for( var i = 0; i < this.assets.Count; i++ ) {
 					var current = this.assets[ i ];
 					base.Logger.LogInformation( !current.Exclude
-												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / notified at {current.NotifiedAt,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
+												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / target {current.BalanceTarget,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
 												   : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
 											  );
 					if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
 						continue;
 
 					if( current.Value <= current.BuyBoundary ) {
-						var amount = current.NotifiedAt - current.Value;
+						var amount = Math.Floor( current.BalanceTarget - current.Value ); // rough inclusion of fee
 						if( cash.Value - amount > base.GeneralSettings.CashFloor ) {
 							await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C}", $"Buy {current.Symbol}" );
 							base.Logger.LogWarning( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C}" );
 							// assume the buy happens and adjust balances
-							amount = Math.Floor( amount );
-							cash.Amount -= Math.Floor( amount ); // rough inclusion of fee
+							cash.Amount -= amount;
 							base.Logger.LogInformation( $"\t\tCurrent shares: {current.Amount:N6}" );
 							current.Amount += amount / current.Price;
 							base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
 							base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
 						} else {
-							await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
+							if( !current.DisableNotifications )
+								await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
 							base.Logger.LogError( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
+							current.DisableNotifications = true;
 						}
 					} else {
-						var amount = current.Value - current.NotifiedAt;
+						var amount = Math.Floor( current.Value - current.BalanceTarget ); // rough inclusion of fee
 						await base.SendNotificationAsync( $"@here {amount:C} SELL {current.Symbol} ({current.Name})", $"Sell {current.Symbol}" );
 						base.Logger.LogWarning( $"\t\t{amount:C} SELL {current.Symbol} ({current.Name})" );
 						// assume the sell happens and adjust balances
-						cash.Amount += Math.Floor( amount ); // rough inclusion of fee
+						cash.Amount += amount;
 						base.Logger.LogInformation( $"\t\tCurrent shares: {current.Amount:N6}" );
 						current.Amount -= amount / current.Price;
 						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
 						base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
 					}
-
-					// prevent multiple notifications at roughly the same value
-					current.NotifiedAt = current.Value;
 				}
 
 				var sum = this.assets.Sum( a => a.Value );

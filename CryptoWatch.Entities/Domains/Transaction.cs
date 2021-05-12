@@ -3,10 +3,8 @@ using System.Collections.Generic;
 
 #nullable disable
 
-namespace CryptoWatch.Entities.Domains
-{
-    public partial class Transaction
-    {
+namespace CryptoWatch.Entities.Domains {
+    public partial class Transaction {
         public int Id { get; set; }
         public string ExternalId { get; set; }
         public int CryptoCurrencyId { get; set; }

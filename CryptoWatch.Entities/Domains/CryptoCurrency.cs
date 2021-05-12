@@ -3,13 +3,10 @@ using System.Collections.Generic;
 
 #nullable disable
 
-namespace CryptoWatch.Entities.Domains
-{
-    public partial class CryptoCurrency
-    {
-        public CryptoCurrency()
-        {
-            Transactions = new HashSet<Transaction>();
+namespace CryptoWatch.Entities.Domains {
+    public partial class CryptoCurrency {
+        public CryptoCurrency( ) {
+            Transactions = new HashSet<Transaction>( );
         }
 
         public int Id { get; set; }
@@ -21,6 +18,7 @@ namespace CryptoWatch.Entities.Domains
         public long? ExternalId { get; set; }
         public DateTime? AddedToExchange { get; set; }
         public bool? Exclude { get; set; }
+        public decimal? BalanceTarget { get; set; }
 
         public virtual ICollection<Transaction> Transactions { get; set; }
     }

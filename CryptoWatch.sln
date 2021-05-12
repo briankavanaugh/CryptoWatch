@@ -15,6 +15,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoinMarketCap", "..\CoinMar
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PushBulletSharp.Core", "..\PushbulletSharp.Core\PushBulletSharp.Core\PushBulletSharp.Core.csproj", "{20E7D37C-F560-432A-AC46-74DDDF5CCF51}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Third-Party", "Third-Party", "{9C65B8B0-356D-48B8-92AF-C7814EB31356}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +50,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FBA68F18-025D-44CB-96A0-479A94E25090} = {9C65B8B0-356D-48B8-92AF-C7814EB31356}
+		{20E7D37C-F560-432A-AC46-74DDDF5CCF51} = {9C65B8B0-356D-48B8-92AF-C7814EB31356}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D4EA300E-6F3C-4CD9-812F-B238F871A360}

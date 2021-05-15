@@ -17,6 +17,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PushBulletSharp.Core", "..\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Third-Party", "Third-Party", "{9C65B8B0-356D-48B8-92AF-C7814EB31356}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Database", "Database", "{1D2D41C5-4662-4857-B4AA-9587069CE196}"
+	ProjectSection(SolutionItems) = preProject
+		Database scripts.sql = Database scripts.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

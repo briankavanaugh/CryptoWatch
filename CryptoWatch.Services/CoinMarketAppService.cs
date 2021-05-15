@@ -133,7 +133,7 @@ namespace CryptoWatch.Services {
 				for( var i = 0; i < this.assets.Count; i++ ) {
 					var current = this.assets[ i ];
 					base.Logger.LogInformation( !current.Exclude
-												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / target {current.BalanceTarget,7:C} / range {current.BuyBoundary,7:C} - {current.SellBoundary,7:C}"
+												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} / limit {current.BuyLimit:C4} - [{current.Price:C4}] - {current.SellLimit:C4}"
 												   : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
 											  );
 					if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )

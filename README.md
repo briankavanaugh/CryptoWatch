@@ -7,11 +7,12 @@ This application requires a MySQL/MariaDB database. The file "Database scripts.s
 
 I use Uphold, so the transaction file format expected is what they use. Note that there may be some symbols that differ between Uphold and CoinMarketCap. One example is Bitcoin Zero (BTC0 versus BTZ). The AltSymbol field is where you put the symbol CoinMarketCap uses. Also, there may be altcoins that CoinMarketCap does not support (e.g., Universal Carbon, UPCO2). these **must** be marked excluded, or your API calls to CoinMarketCap will fail.
 
-A subscription to [CoinMarketCap Pro API v1](https://pro.coinmarketcap.com/api/v1) is required. The free version should be enough. The refresh and do not disturb settings are such that you shouldn't exceed the daily or monthly limits (see appSettings.json/General).
+A subscription to [CoinMarketCap Pro API v1](https://pro.coinmarketcap.com/api/v1) is required. The free version should be enough. The refresh and do not disturb settings are such that you shouldn't exceed the daily or monthly limits (see appSettings.json/General). Note that it is configured to run against their sandbox if compiled in debug mode.
 
-This is using a modified version of [CoinMarketCap API Client](https://github.com/lzehrung/coinmarketcap), so that multiple symbols can be submitted at one time. I've submitted a pull request to address this, but a release including it has not happend yet as of writing this (current version is 2.0.0 from June 17, 2020). Once it has, CryptoWatch.Services can be modified to reference that NuGet package. Until then, my modified version is available [here](https://github.com/briankavanaugh/coinmarketcap).
+This is using a modified version of [CoinMarketCap API Client](https://github.com/lzehrung/coinmarketcap), so that multiple symbols can be submitted at one time. I've submitted a pull request to address this, but a release including it has not happened yet as of writing this (current version is 2.0.0 from June 17, 2020). Once it has, CryptoWatch.Services can be modified to reference that NuGet package. Until then, my modified version is available [here](https://github.com/briankavanaugh/coinmarketcap).
 
 There is optional support for using Google Sheets to log your transactions. [This article](https://medium.com/@williamchislett/writing-to-google-sheets-api-using-net-and-a-services-account-91ee7e4a291) covers how to set that up. Some notes on how it works:
+* The credentials.json file must be in the same directory as the executable.
 * Each symbol has its own sheet matching the Symbol field.
 * Excluded symbols are not written, except for the cash symbol.
 * The cash position will have all transactions listed, assuming all other transactions were either buying or selling cash.

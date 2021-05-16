@@ -16,7 +16,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B460BE66-4CA3-4A4A-BEF5-9EDB9B3C6243}"
 	ProjectSection(SolutionItems) = preProject
 		Database scripts.sql = Database scripts.sql
-		CryptoWatch\LICENSE = CryptoWatch\LICENSE
+		LICENSE = LICENSE
 		README.md = README.md
 	EndProjectSection
 EndProject

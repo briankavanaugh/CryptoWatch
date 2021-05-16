@@ -7,6 +7,8 @@ This application requires a MySQL/MariaDB database. The file "Database scripts.s
 
 I use [Uphold](https://uphold.com/), so the transaction file format expected is what they use. Note that there may be some symbols that differ between Uphold and CoinMarketCap. One example is Bitcoin Zero (BTC0 versus BTZ). The CryptoCurrency.AltSymbol field is where you put the symbol CoinMarketCap uses. Also, there may be altcoins that CoinMarketCap does not support (e.g., Universal Carbon, UPCO2). these **must** be marked excluded (CryptoCurrency.Exclude = 1), or your API calls to CoinMarketCap will fail.
 
+Uphold supports limit orders now, so those are calculated and displayed. To control the thresholds for buys and sells, modify CryptoCurrency.BalanceTarget, .BuyTarget and .SellTarget.
+
 A subscription to [CoinMarketCap Pro API v1](https://pro.coinmarketcap.com/api/v1) is required. The free version should be enough. The refresh and do not disturb settings are such that you shouldn't exceed the daily or monthly limits (see appSettings.json/General). Note that it is configured to run against their sandbox if compiled in debug mode.
 
 This is using a modified version of [CoinMarketCap API Client](https://github.com/lzehrung/coinmarketcap), so that multiple symbols can be submitted at one time. I've submitted a pull request to address this, but a release including it has not happened yet as of writing this (current version is 2.0.0 from June 17, 2020). Once it has, CryptoWatch.Services can be modified to reference that NuGet package. Until then, my modified version is available [here](https://github.com/briankavanaugh/coinmarketcap).

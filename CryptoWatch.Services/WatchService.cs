@@ -87,7 +87,6 @@ namespace CryptoWatch.Services {
 			await Task.Delay( TimeSpan.FromSeconds( 5 ), cancellationToken );
 			try {
 				var fileTransactions = await this.processFileAsync( e.FullPath, cancellationToken );
-				this.Processing = false; // don't need to wait on writing to Google Sheets 
 				await this.updateGoogleSheets( fileTransactions, cancellationToken );
 				if( this.PriceService != null ) {
 					this.PriceService.SkipNextUpdate = true;

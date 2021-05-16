@@ -11,7 +11,7 @@ namespace CryptoWatch.Entities.Domains {
 
 		[NotMapped]
 		public decimal BuyBoundary
-			=> this.BalanceTarget < 10m ? 0m : this.BalanceTarget - ( this.BalanceTarget * 0.15m );
+			=> this.BalanceTarget < 10m ? 0m : this.BalanceTarget - ( this.BalanceTarget * this.BuyTarget );
 
 		[NotMapped]
 		public decimal BuyLimit
@@ -19,7 +19,7 @@ namespace CryptoWatch.Entities.Domains {
 
 		[NotMapped]
 		public decimal SellBoundary
-			=> this.BalanceTarget + ( this.BalanceTarget * 0.15m );
+			=> this.BalanceTarget + ( this.BalanceTarget * this.SellTarget );
 
 		[NotMapped]
 		public decimal SellLimit

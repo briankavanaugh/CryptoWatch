@@ -18,7 +18,9 @@ namespace CryptoWatch.Entities.Domains {
         public long? ExternalId { get; set; }
         public DateTime? AddedToExchange { get; set; }
         public bool? Exclude { get; set; }
-        public decimal? BalanceTarget { get; set; }
+        public decimal BalanceTarget { get; set; }
+        public decimal BuyTarget { get; set; }
+        public decimal SellTarget { get; set; }
 
         public virtual ICollection<Transaction> Transactions { get; set; }
     }

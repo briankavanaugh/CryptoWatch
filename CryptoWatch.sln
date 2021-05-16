@@ -11,12 +11,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch.Core", "CryptoW
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CryptoWatch.Services", "CryptoWatch.Services\CryptoWatch.Services.csproj", "{B1CEC19C-1AAD-450E-BEAC-3938B1F4A455}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Database", "Database", "{1D2D41C5-4662-4857-B4AA-9587069CE196}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoinMarketCap", "..\CoinMarketCap\CoinMarketCap\CoinMarketCap.csproj", "{6FD49B5D-9F12-471E-A9A4-9BC59ED0DD65}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{B460BE66-4CA3-4A4A-BEF5-9EDB9B3C6243}"
 	ProjectSection(SolutionItems) = preProject
 		Database scripts.sql = Database scripts.sql
+		CryptoWatch\LICENSE = CryptoWatch\LICENSE
+		README.md = README.md
 	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoinMarketCap", "..\CoinMarketCap\CoinMarketCap\CoinMarketCap.csproj", "{6FD49B5D-9F12-471E-A9A4-9BC59ED0DD65}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

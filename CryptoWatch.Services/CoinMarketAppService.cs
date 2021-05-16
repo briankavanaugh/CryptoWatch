@@ -23,8 +23,6 @@ namespace CryptoWatch.Services {
 		private readonly object lockObject = new( );
 		private bool processing = false;
 
-		// set to false only if database is empty and symbols need to be added
-		private bool initialized = true;
 		private bool skipNextUpdate;
 		private readonly object skipLock = new( );
 
@@ -49,7 +47,7 @@ namespace CryptoWatch.Services {
 		#region Properties
 
 		/// <inheritdoc />
-		protected override string ServiceName { get; } = nameof(CoinMarketCapService);
+		protected override string ServiceName { get; } = nameof( CoinMarketCapService );
 
 		public bool SkipNextUpdate {
 			get {
@@ -73,24 +71,19 @@ namespace CryptoWatch.Services {
 			client.HttpClient.BaseAddress = new Uri( base.CoinMarketCapSettings.BaseUrl );
 			while( true ) {
 				var now = DateTime.Now;
-				if( now.Hour >= 23 || now.Hour < 4 ) {
-					// don't bother with updates or notifications between 11 pm and 4 am
+				if( now.Hour >= base.GeneralSettings.DndStart || now.Hour < base.GeneralSettings.DndEnd ) {
+					// don't bother with updates or notifications during do not disturb hours
 					base.Logger.LogInformation( "Skipping update." );
 				} else {
-					if( !this.initialized ) {
-						await this.loadInitialData( cancellationToken );
-						this.initialized = true;
-					} else {
-						if( this.SkipNextUpdate )
-							this.SkipNextUpdate = false;
-						else
-							await ( (IPriceService) this ).UpdateBalances( cancellationToken );
-					}
+					if( this.SkipNextUpdate )
+						this.SkipNextUpdate = false;
+					else
+						await ( (IPriceService) this ).UpdateBalances( cancellationToken );
 				}
 
-				base.Logger.LogInformation( "Sleeping for five minutes." );
+				base.Logger.LogInformation( $"Sleeping for {base.GeneralSettings.SleepInterval} minutes." );
 				Console.WriteLine( );
-				await Task.Delay( TimeSpan.FromMinutes( 5 ), cancellationToken );
+				await Task.Delay( TimeSpan.FromMinutes( base.GeneralSettings.SleepInterval ), cancellationToken );
 				if( cancellationToken.IsCancellationRequested )
 					break;
 			}
@@ -117,24 +110,31 @@ namespace CryptoWatch.Services {
 					this.watcher.Changed = false;
 				}
 
+				if( this.assets.Count == 0 ) {
+					// should always be at least the cash position, so create that
+					await this.initializeAsync( cancellationToken );
+					base.Logger.LogWarning( "Database initialized. Drop a transaction file in the watch directory to start the process." );
+					return;
+				}
+
 				var parameters = new LatestQuoteParameters( );
 				parameters.Symbols.AddRange( this.assets.Where( a => !a.Exclude ).Select( s => s.AltSymbol ) );
 				var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
 				foreach( var (_, value) in response.Data ) {
 					var asset = this.assets.First( a => a.AltSymbol.Equals( value.Symbol, StringComparison.OrdinalIgnoreCase ) );
-					var price = value.Quote[ "USD" ].Price;
+					var price = value.Quote[ base.GeneralSettings.CashSymbol ].Price;
 					if( !price.HasValue )
 						continue;
 					asset.Price = Convert.ToDecimal( price.Value );
 				}
 
 				assets = this.assets.OrderByDescending( a => a.Value ).ToList( );
-				var cash = this.assets.First( a => a.Symbol.Equals( "USD" ) );
+				var cash = this.assets.First( a => a.Symbol.Equals( base.GeneralSettings.CashSymbol ) );
 				for( var i = 0; i < this.assets.Count; i++ ) {
 					var current = this.assets[ i ];
 					base.Logger.LogInformation( !current.Exclude
-												   ? $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C} | limit: {current.BuyLimit,12:C4}...{current.Price.ToString( "C4" ).PadLeft( 12, '.' )}...{current.SellLimit.ToString( "C4" ).PadLeft( 12, '.' )}"
-												   : $"{current.Symbol,-4} ({current.Name + "):",-23} {current.Value,7:C}"
+												   ? $"{current.Value,7:C} | limit: {current.BuyLimit,12:C4}...{current.Price.ToString( "C4" ).PadLeft( 12, '.' )}...{current.SellLimit.ToString( "C4" ).PadLeft( 12, '.' )} | {current.Symbol,-4} ({current.Name})"
+												   : $"{current.Value,7:C} | {current.Symbol} ({current.Name})"
 											  );
 					if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
 						continue;
@@ -177,40 +177,15 @@ namespace CryptoWatch.Services {
 			}
 		}
 
-		private async Task loadInitialData( CancellationToken cancellationToken ) {
-			base.Logger.LogInformation( "Loading initial data." );
-			var parameters = new LatestQuoteParameters( );
-			parameters.Symbols.AddRange( new[ ] { "ATOM", "BTG", "BTC", "ETH", "XRP", "ADA", "ZRX", "BAT", "BZX", "DOGE", "LTC" } );
-			var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
-			base.Logger.LogInformation( $"{response.Data.Count} symbols to add." );
-			CryptoCurrency crypto;
-			foreach( var (_, value) in response.Data ) {
-				crypto = new CryptoCurrency {
-					Symbol = value.Symbol,
-					AltSymbol = value.Symbol,
-					AddedToExchange = value.DateAdded?.Date,
-					ExternalId = value.Id,
-					Slug = value.Slug,
-					Name = value.Name
-				};
-				await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
-			}
+		private async Task initializeAsync( CancellationToken cancellationToken ) {
+			base.Logger.LogInformation( "Initializing database." );
 
-			// add and exclude USD and UPCO2
-			crypto = new CryptoCurrency {
-				Symbol = "USD",
-				AltSymbol = "USD",
-				Slug = "us-dollar",
-				Name = "US Dollar",
-				Exclude = true
-			};
-			await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );
-
-			crypto = new CryptoCurrency {
-				Symbol = "UPCO2",
-				AltSymbol = "UPCO2",
-				Slug = "universal-carbon",
-				Name = "Universal Carbon",
+			// add and exclude cash
+			var crypto = new CryptoCurrency {
+				Symbol = base.GeneralSettings.CashSymbol,
+				AltSymbol = base.GeneralSettings.CashSymbol,
+				Slug = base.GeneralSettings.CashSlug,
+				Name = base.GeneralSettings.CashName,
 				Exclude = true
 			};
 			await base.Context.CryptoCurrencies.AddAsync( crypto, cancellationToken );

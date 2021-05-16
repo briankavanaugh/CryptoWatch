@@ -9,5 +9,7 @@ namespace CryptoWatch.Entities.Domains {
         public bool Exclude { get; set; }
         public decimal? Amount { get; set; }
         public decimal BalanceTarget { get; set; }
+        public decimal BuyTarget { get; set; }
+        public decimal SellTarget { get; set; }
     }
 }

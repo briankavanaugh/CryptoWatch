@@ -216,7 +216,7 @@ namespace CryptoWatch.Services {
 				this.Changed = true;
 			this.Logger.LogInformation( $"{@new.Count} transactions saved to database:" );
 			for( var i = 0; i < @new.Count; i++ ) {
-				this.Logger.LogInformation( @new[ i ].CryptoCurrency.Symbol.Equals( "USD", StringComparison.OrdinalIgnoreCase )
+				this.Logger.LogInformation( @new[ i ].CryptoCurrency.Symbol.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase )
 					                           ? $"\t\t{@new[ i ].CryptoCurrency.Symbol,-4} {@new[ i ].Amount:C}"
 					                           : $"\t\t{@new[ i ].CryptoCurrency.Symbol,-4} {@new[ i ].Amount:N6}" );
 			}
@@ -297,7 +297,7 @@ namespace CryptoWatch.Services {
 			transactions = transactions.OrderBy( t => t.Date ).ToList( );
 			var list = await this.processAsync( transactions, cancellationToken );
 			// cash has different processing requirements than the others
-			var cash = this.processUsd(transactions );
+			var cash = this.processCash(transactions );
 			list.Add( cash );
 			base.Logger.LogInformation( "Starting batch update" );
 			var requestBody = new BatchUpdateValuesRequest { ValueInputOption = "USER_ENTERED", Data = list };
@@ -306,17 +306,17 @@ namespace CryptoWatch.Services {
 			base.Logger.LogInformation( "Finished updating Google Sheets." );
 		}
 
-		private ValueRange processUsd( IReadOnlyList<FileTransaction> transactions ) {
+		private ValueRange processCash( IReadOnlyList<FileTransaction> transactions ) {
 			var values = new List<IList<object>>( );
 			var row = 1;
-			// process USD sheet
+			// process cash sheet
 			for( var i = 0; i < transactions.Count; i++ ) {
 				var current = transactions[ i ];
 				var formula = i == 0 ? $"=B{row}" : $"=B{row}+C{row - 1}";
 				switch( current.Type.ToUpperInvariant( ) ) {
 					case "TRANSFER": {
 						// buy/sell
-						values.Add( current.OriginCurrency.Equals( "USD", StringComparison.OrdinalIgnoreCase )
+						values.Add( current.OriginCurrency.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase )
 							           ? new List<object> { current.Date.ToShortDateString( ), $"{current.OriginAmount * -1m:C}", formula, $"Buy {current.DestinationCurrency}" }
 							           : new List<object> { current.Date.ToShortDateString( ), $"{current.DestinationAmount:C}", formula, $"Sell {current.OriginCurrency}" } );
 						row++;
@@ -324,8 +324,8 @@ namespace CryptoWatch.Services {
 					}
 					case "IN": {
 						// transfer into Uphold
-						// only care about USD - transfers will have same currency on both sides
-						if( !current.OriginCurrency.Equals( "USD", StringComparison.OrdinalIgnoreCase ) )
+						// only care about cash - transfers will have same currency on both sides
+						if( !current.OriginCurrency.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase ) )
 							continue;
 						values.Add( new List<object> { current.Date.ToShortDateString( ), $"{current.DestinationAmount:C}", formula, $"In {current.OriginCurrency}" } );
 						row++;
@@ -333,8 +333,8 @@ namespace CryptoWatch.Services {
 					}
 					case "OUT": {
 						// transfer out of Uphold
-						// only care about USD - transfers will have same currency on both sides
-						if( !current.OriginCurrency.Equals( "USD", StringComparison.OrdinalIgnoreCase ) )
+						// only care about cash - transfers will have same currency on both sides
+						if( !current.OriginCurrency.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase ) )
 							continue;
 						values.Add( new List<object> { current.Date.ToShortDateString( ), $"{current.DestinationAmount * -1m:C}", formula, $"Out {current.OriginCurrency}" } );
 						row++;
@@ -343,9 +343,9 @@ namespace CryptoWatch.Services {
 				}
 			}
 
-			base.Logger.LogInformation( $"{row - 1} USD transactions generated" );
+			base.Logger.LogInformation( $"{row - 1} {base.GeneralSettings.CashSymbol} transactions generated" );
 
-			return new ValueRange { Range = "USD!A1:D", Values = values };
+			return new ValueRange { Range = $"{base.GeneralSettings.CashSymbol}!A1:D", Values = values };
 		}
 
 		private async Task<List<ValueRange>> processAsync( IReadOnlyCollection<FileTransaction> transactions, CancellationToken cancellationToken ) {
@@ -369,22 +369,22 @@ namespace CryptoWatch.Services {
 					switch( current.Type.ToUpperInvariant( ) ) {
 						case "TRANSFER": {
 							// buy/sell
-							if( current.OriginCurrency.Equals( "USD", StringComparison.OrdinalIgnoreCase ) ) {
+							if( current.OriginCurrency.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase ) ) {
 								// selling cash, buying whatever
 								balanceValues.Add( new List<object> { current.Date.ToShortDateString( ), balancePrice, $"={current.OriginAmount:N2}", current.DestinationAmount, balanceShares } );
 								buyValues.Add( new List<object> { current.Date.ToShortDateString( ), buyPrice, $"={current.OriginAmount:N2}", current.DestinationAmount } );
 								balanceCount++;
 								buyCount++;
 
-							} else if( current.DestinationCurrency.Equals( "USD", StringComparison.OrdinalIgnoreCase ) ) {
+							} else if( current.DestinationCurrency.Equals( base.GeneralSettings.CashSymbol, StringComparison.OrdinalIgnoreCase ) ) {
 								// raising cash, selling whatever
-								balanceValues.Add( new List<object> { current.Date.ToShortDateString( ), balancePrice, $"={current.DestinationAmount * -1m:N2}", current.OriginAmount * -1, balanceShares } );
-								sellValues.Add( new List<object> { current.Date.ToShortDateString( ), sellPrice, $"={current.DestinationAmount * -1m:N2}", current.OriginAmount * -1 } );
+								balanceValues.Add( new List<object> { current.Date.ToShortDateString( ), balancePrice, $"={current.DestinationAmount * -1m:N2}", current.OriginAmount * -1m, balanceShares } );
+								sellValues.Add( new List<object> { current.Date.ToShortDateString( ), sellPrice, $"={current.DestinationAmount * -1m:N2}", current.OriginAmount * -1m } );
 								balanceCount++;
 								sellCount++;
 							} else if( current.OriginCurrency.Equals( asset.Symbol, StringComparison.OrdinalIgnoreCase ) ) {
 								// selling whatever, buying non-cash (won't have an actual price I can calculate)
-								balanceValues.Add( new List<object> { current.Date.ToShortDateString( ), string.Empty, string.Empty, current.OriginAmount * -1, balanceShares } );
+								balanceValues.Add( new List<object> { current.Date.ToShortDateString( ), string.Empty, string.Empty, current.OriginAmount * -1m, balanceShares } );
 								balanceCount++;
 							} else {
 								// buying whatever, selling non-cash (won't have an actual price I can calculate)

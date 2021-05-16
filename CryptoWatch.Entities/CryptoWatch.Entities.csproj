@@ -8,5 +8,4 @@
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="5.0.0" />
     <PackageReference Include="Slack.Webhooks" Version="1.1.5" />
   </ItemGroup>
-
 </Project>

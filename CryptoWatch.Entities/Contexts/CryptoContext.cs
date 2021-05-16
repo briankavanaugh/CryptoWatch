@@ -5,6 +5,7 @@ using CryptoWatch.Entities.Domains;
 
 namespace CryptoWatch.Entities.Contexts {
     public partial class CryptoContext : DbContext {
+
         public CryptoContext( DbContextOptions<CryptoContext> options )
             : base( options ) {
         }
@@ -32,6 +33,10 @@ namespace CryptoWatch.Entities.Contexts {
                     .HasPrecision( 10, 2 )
                     .HasComment( "Default target balance" );
 
+                entity.Property( e => e.BuyTarget )
+                    .HasPrecision( 6, 4 )
+                    .HasComment( "Percent loss to repurchase (0 to ignore)" );
+
                 entity.Property( e => e.Exclude )
                     .HasColumnType( "bit(1)" )
                     .HasComment( "When true, exclude from quote requests" );
@@ -39,6 +44,10 @@ namespace CryptoWatch.Entities.Contexts {
                 entity.Property( e => e.Id ).HasColumnType( "int(11)" );
 
                 entity.Property( e => e.Name ).HasMaxLength( 50 );
+
+                entity.Property( e => e.SellTarget )
+                    .HasPrecision( 6, 4 )
+                    .HasComment( "Percent gain to sell (0 to ignore)" );
 
                 entity.Property( e => e.Symbol )
                     .IsRequired( )
@@ -63,6 +72,11 @@ namespace CryptoWatch.Entities.Contexts {
                     .HasDefaultValueSql( "'100.00'" )
                     .HasComment( "Default target balance" );
 
+                entity.Property( e => e.BuyTarget )
+                    .HasPrecision( 6, 4 )
+                    .HasDefaultValueSql( "'0.1500'" )
+                    .HasComment( "Percent loss to repurchase (0 to ignore)" );
+
                 entity.Property( e => e.Created )
                     .HasColumnType( "timestamp" )
                     .HasDefaultValueSql( "current_timestamp()" );
@@ -75,6 +89,11 @@ namespace CryptoWatch.Entities.Contexts {
                 entity.Property( e => e.ExternalId ).HasColumnType( "bigint(20)" );
 
                 entity.Property( e => e.Name ).HasMaxLength( 50 );
+
+                entity.Property( e => e.SellTarget )
+                    .HasPrecision( 6, 4 )
+                    .HasDefaultValueSql( "'0.1500'" )
+                    .HasComment( "Percent gain to sell (0 to ignore)" );
 
                 entity.Property( e => e.Slug ).HasMaxLength( 50 );
 

@@ -1,5 +1,4 @@
 -- --------------------------------------------------------
--- Host:                         vitalstatistix.gaulishvillage.home
 -- Server version:               10.4.19-MariaDB-1:10.4.19+maria~bionic-log - mariadb.org binary distribution
 -- Server OS:                    debian-linux-gnu
 -- HeidiSQL Version:             11.2.0.6213
@@ -14,10 +13,12 @@
 
 
 -- Dumping database structure for Crypto
+DROP DATABASE IF EXISTS `Crypto`;
 CREATE DATABASE IF NOT EXISTS `Crypto` /*!40100 DEFAULT CHARACTER SET utf8 */;
 USE `Crypto`;
 
 -- Dumping structure for view Crypto.Balance
+DROP VIEW IF EXISTS `Balance`;
 -- Creating temporary table to overcome VIEW dependency errors
 CREATE TABLE `Balance` (
 	`Id` INT(11) NOT NULL,
@@ -26,10 +27,13 @@ CREATE TABLE `Balance` (
 	`Name` VARCHAR(50) NULL COLLATE 'utf8_general_ci',
 	`Exclude` BIT(1) NOT NULL COMMENT 'When true, exclude from quote requests',
 	`Amount` DECIMAL(45,18) NULL,
-	`BalanceTarget` DECIMAL(10,2) NOT NULL COMMENT 'Default target balance'
+	`BalanceTarget` DECIMAL(10,2) NOT NULL COMMENT 'Default target balance',
+	`BuyTarget` DECIMAL(6,4) NOT NULL COMMENT 'Percent loss to repurchase',
+	`SellTarget` DECIMAL(6,4) NOT NULL COMMENT 'Percent gain to sell'
 ) ENGINE=MyISAM;
 
 -- Dumping structure for table Crypto.CryptoCurrency
+DROP TABLE IF EXISTS `CryptoCurrency`;
 CREATE TABLE IF NOT EXISTS `CryptoCurrency` (
   `Id` int(11) NOT NULL AUTO_INCREMENT,
   `Symbol` varchar(10) NOT NULL,
@@ -41,6 +45,8 @@ CREATE TABLE IF NOT EXISTS `CryptoCurrency` (
   `AddedToExchange` date DEFAULT NULL,
   `Exclude` bit(1) NOT NULL DEFAULT b'0' COMMENT 'When true, exclude from quote requests',
   `BalanceTarget` decimal(10,2) NOT NULL DEFAULT 100.00 COMMENT 'Default target balance',
+  `BuyTarget` decimal(6,4) NOT NULL DEFAULT 0.1500 COMMENT 'Percent loss to repurchase',
+  `SellTarget` decimal(6,4) NOT NULL DEFAULT 0.1500 COMMENT 'Percent gain to sell',
   PRIMARY KEY (`Id`),
   KEY `Symbol` (`Symbol`)
 ) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8;
@@ -48,6 +54,7 @@ CREATE TABLE IF NOT EXISTS `CryptoCurrency` (
 -- Data exporting was unselected.
 
 -- Dumping structure for table Crypto.Transaction
+DROP TABLE IF EXISTS `Transaction`;
 CREATE TABLE IF NOT EXISTS `Transaction` (
   `Id` int(11) NOT NULL AUTO_INCREMENT,
   `ExternalId` char(36) NOT NULL COMMENT 'UUID',
@@ -62,14 +69,15 @@ CREATE TABLE IF NOT EXISTS `Transaction` (
   PRIMARY KEY (`Id`),
   KEY `FK_Transaction_CryptoCurrency` (`CryptoCurrencyId`),
   CONSTRAINT `FK_Transaction_CryptoCurrency` FOREIGN KEY (`CryptoCurrencyId`) REFERENCES `CryptoCurrency` (`Id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1009 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1011 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 
 -- Dumping structure for view Crypto.Balance
+DROP VIEW IF EXISTS `Balance`;
 -- Removing temporary table and create final VIEW structure
 DROP TABLE IF EXISTS `Balance`;
-CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `Balance` AS select `c`.`Id` AS `Id`,`c`.`Symbol` AS `Symbol`,`c`.`AltSymbol` AS `AltSymbol`,`c`.`Name` AS `Name`,`c`.`Exclude` AS `Exclude`,sum(`t`.`Amount`) AS `Amount`,`c`.`BalanceTarget` AS `BalanceTarget` from (`Transaction` `t` join `CryptoCurrency` `c` on(`t`.`CryptoCurrencyId` = `c`.`Id`)) group by `c`.`Id`,`c`.`Symbol`,`c`.`AltSymbol`,`c`.`Name`,`c`.`Exclude`,`c`.`BalanceTarget` having sum(`t`.`Amount`) > 0;
+CREATE ALGORITHM=UNDEFINED SQL SECURITY DEFINER VIEW `Balance` AS select `c`.`Id` AS `Id`,`c`.`Symbol` AS `Symbol`,`c`.`AltSymbol` AS `AltSymbol`,`c`.`Name` AS `Name`,`c`.`Exclude` AS `Exclude`,sum(`t`.`Amount`) AS `Amount`,`c`.`BalanceTarget` AS `BalanceTarget`,`c`.`BuyTarget` AS `BuyTarget`,`c`.`SellTarget` AS `SellTarget` from (`Transaction` `t` join `CryptoCurrency` `c` on(`t`.`CryptoCurrencyId` = `c`.`Id`)) group by `c`.`Id`,`c`.`Symbol`,`c`.`AltSymbol`,`c`.`Name`,`c`.`Exclude`,`c`.`BalanceTarget`,`c`.`BuyTarget`,`c`.`SellTarget` having sum(`t`.`Amount`) > 0;
 
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
 /*!40014 SET FOREIGN_KEY_CHECKS=IFNULL(@OLD_FOREIGN_KEY_CHECKS, 1) */;

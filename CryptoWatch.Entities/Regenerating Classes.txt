@@ -6,9 +6,10 @@ CryptoContext
 * Remove default constructor
 * Remove default for Balance/Exclude
 * Remove default for Balance/BalanceTarget
+* Remove default for Balance/BuyTarget
+* Remove default for Balance/SellTarget
 
 Model 
 * CryptoCurrency - Exclude should be bool?
 * Transaction - ExternalId should be string
 * Balance - Exclude should be bool
-* Balance - BalanceTarget should be decimal

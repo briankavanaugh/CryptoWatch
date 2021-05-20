@@ -139,6 +139,7 @@ namespace CryptoWatch.Services {
 					if( current.Exclude || current.Value > current.BuyBoundary && current.Value < current.SellBoundary )
 						continue;
 
+					var showNewlimits = true;
 					if( current.Value <= current.BuyBoundary ) {
 						var amount = Math.Floor( current.BalanceTarget - current.Value ); // rough inclusion of fee
 						if( cash.Value - amount > base.GeneralSettings.CashFloor ) {
@@ -155,6 +156,7 @@ namespace CryptoWatch.Services {
 								await base.SendNotificationAsync( $"@here {amount:C} BUY  {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***", $"Buy {current.Symbol} - not enough cash" );
 							base.Logger.LogError( $"\t\t{amount:C} BUY {current.Symbol} ({current.Name}) cash: {cash.Value:C} *** not enough cash ***" );
 							current.DisableNotifications = true;
+							showNewlimits = false;
 						}
 					} else {
 						var amount = Math.Floor( current.Value - current.BalanceTarget ); // rough inclusion of fee
@@ -167,6 +169,8 @@ namespace CryptoWatch.Services {
 						base.Logger.LogInformation( $"\t\tAdjusted cash: {cash.Amount:C}" );
 						base.Logger.LogInformation( $"\t\t{current.Symbol}: {current.Value:C} / {current.Amount:N6}" );
 					}
+					if( showNewlimits )
+						base.Logger.LogInformation( $"        | new:   {current.BuyLimit,12:C4}...{current.Price.ToString( "C4" ).PadLeft( 12, '.' )}...{current.SellLimit.ToString( "C4" ).PadLeft( 12, '.' )} |" );
 				}
 
 				var sum = this.assets.Sum( a => a.Value );

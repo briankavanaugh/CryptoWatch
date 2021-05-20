@@ -90,6 +90,8 @@ namespace CryptoWatch.Services {
 				await this.updateGoogleSheets( fileTransactions, cancellationToken );
 				if( this.PriceService != null ) {
 					this.PriceService.SkipNextUpdate = true;
+					lock( this.processingLock )
+						this.Processing = false;
 					await this.PriceService.UpdateBalances( cancellationToken );
 				}
 			} catch( Exception ex ) {

@@ -119,6 +119,7 @@ namespace CryptoWatch.Services {
 
 				var parameters = new LatestQuoteParameters( );
 				parameters.Symbols.AddRange( this.assets.Where( a => !a.Exclude ).Select( s => s.AltSymbol ) );
+				base.Logger.LogInformation( "Retrieving quotes." );
 				var response = await this.client.GetLatestQuoteAsync( parameters, cancellationToken );
 				foreach( var (_, value) in response.Data ) {
 					var asset = this.assets.First( a => a.AltSymbol.Equals( value.Symbol, StringComparison.OrdinalIgnoreCase ) );
@@ -175,6 +176,8 @@ namespace CryptoWatch.Services {
 
 				var sum = this.assets.Sum( a => a.Value );
 				base.Logger.LogInformation( $"Account balance: {sum,10:C}" );
+			} catch( Exception ex ) {
+				base.Logger.LogError( ex, "Failed to run" );
 			} finally {
 				lock( this.lockObject )
 					this.processing = false;

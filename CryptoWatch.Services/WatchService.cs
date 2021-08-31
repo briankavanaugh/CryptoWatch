@@ -445,8 +445,9 @@ namespace CryptoWatch.Services {
 				// The file token.json stores the user's access and refresh tokens, and is created
 				// automatically when the authorization flow completes for the first time.
 				const string credPath = "token.json";
+				var secrets = await GoogleClientSecrets.FromStreamAsync( stream, cancellationToken );
 				var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-				                                                                   GoogleClientSecrets.Load( stream ).Secrets,
+				                                                                   secrets.Secrets,
 				                                                                   scopes,
 				                                                                   "user",
 				                                                                   cancellationToken,
